@@ -3,6 +3,7 @@ package com.candypop.game;
 import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -36,6 +37,8 @@ public class MainActivity extends Activity {
 
         private final ArrayList<Candy> candies = new ArrayList<>();
 
+        private final SharedPreferences preferences;
+
         private int score = 0;
         private int highScore = 0;
         private int timeLeft = 60;
@@ -63,9 +66,7 @@ public class MainActivity extends Activity {
                         timeLeft = 0;
                         gameOver = true;
 
-                        if (score > highScore) {
-                            highScore = score;
-                        }
+                        saveHighScore();
                     }
 
                     invalidate();
@@ -80,6 +81,16 @@ public class MainActivity extends Activity {
         CandyGameView() {
             super(MainActivity.this);
 
+            preferences = getSharedPreferences(
+                    "CandyJoltSettings",
+                    MODE_PRIVATE
+            );
+
+            highScore = preferences.getInt(
+                    "highScore",
+                    0
+            );
+
             paint.setTypeface(
                     Typeface.create(
                             Typeface.DEFAULT,
@@ -88,6 +99,18 @@ public class MainActivity extends Activity {
             );
 
             startGame();
+        }
+
+        private void saveHighScore() {
+
+            if (score > highScore) {
+
+                highScore = score;
+
+                preferences.edit()
+                        .putInt("highScore", highScore)
+                        .apply();
+            }
         }
 
         private void startGame() {
@@ -194,6 +217,7 @@ public class MainActivity extends Activity {
         private void drawHeader(Canvas canvas) {
 
             paint.setTextAlign(Paint.Align.CENTER);
+
             paint.setTypeface(
                     Typeface.create(
                             Typeface.DEFAULT,
@@ -205,7 +229,7 @@ public class MainActivity extends Activity {
             paint.setTextSize(34);
 
             canvas.drawText(
-                    "CANDY POP",
+                    "CANDYJOLT",
                     getWidth() / 2f,
                     55,
                     paint
@@ -250,7 +274,6 @@ public class MainActivity extends Activity {
 
             for (Candy candy : candies) {
 
-                // Candy
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(candy.color);
 
@@ -261,7 +284,6 @@ public class MainActivity extends Activity {
                         paint
                 );
 
-                // Shine
                 paint.setColor(
                         Color.argb(
                                 220,
@@ -280,7 +302,6 @@ public class MainActivity extends Activity {
                         paint
                 );
 
-                // Stripe
                 paint.setColor(
                         Color.argb(
                                 100,
