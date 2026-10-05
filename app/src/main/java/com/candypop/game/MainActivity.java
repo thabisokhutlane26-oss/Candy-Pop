@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
         private int score = 0;
         private int highScore = 0;
         private int timeLeft = 60;
+        private int level = 1;
 
         private boolean gameOver = false;
 
@@ -117,6 +118,7 @@ public class MainActivity extends Activity {
 
             score = 0;
             timeLeft = 60;
+            level = 1;
             gameOver = false;
 
             candies.clear();
@@ -129,6 +131,26 @@ public class MainActivity extends Activity {
             handler.postDelayed(timer, 1000);
 
             invalidate();
+        }
+
+        private void updateLevel() {
+
+            int newLevel = (score / 100) + 1;
+
+            if (newLevel != level) {
+
+                level = newLevel;
+
+                int targetCandies =
+                        Math.min(
+                                10 + level * 5,
+                                35
+                        );
+
+                while (candies.size() < targetCandies) {
+                    candies.add(createCandy());
+                }
+            }
         }
 
         private Candy createCandy() {
@@ -235,7 +257,7 @@ public class MainActivity extends Activity {
                     paint
             );
 
-            paint.setTextSize(20);
+            paint.setTextSize(18);
 
             paint.setColor(
                     Color.rgb(255, 220, 80)
@@ -243,7 +265,7 @@ public class MainActivity extends Activity {
 
             canvas.drawText(
                     "SCORE: " + score,
-                    getWidth() * 0.25f,
+                    getWidth() * 0.20f,
                     105,
                     paint
             );
@@ -254,7 +276,18 @@ public class MainActivity extends Activity {
 
             canvas.drawText(
                     "TIME: " + timeLeft,
-                    getWidth() * 0.75f,
+                    getWidth() * 0.50f,
+                    105,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(255, 120, 210)
+            );
+
+            canvas.drawText(
+                    "LEVEL: " + level,
+                    getWidth() * 0.80f,
                     105,
                     paint
             );
@@ -354,7 +387,7 @@ public class MainActivity extends Activity {
             canvas.drawText(
                     "GAME OVER",
                     getWidth() / 2f,
-                    getHeight() * 0.34f,
+                    getHeight() * 0.30f,
                     paint
             );
 
@@ -367,7 +400,20 @@ public class MainActivity extends Activity {
             canvas.drawText(
                     "Score: " + score,
                     getWidth() / 2f,
-                    getHeight() * 0.43f,
+                    getHeight() * 0.39f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(255, 120, 210)
+            );
+
+            paint.setTextSize(24);
+
+            canvas.drawText(
+                    "Level: " + level,
+                    getWidth() / 2f,
+                    getHeight() * 0.45f,
                     paint
             );
 
@@ -377,7 +423,7 @@ public class MainActivity extends Activity {
             canvas.drawText(
                     "High Score: " + highScore,
                     getWidth() / 2f,
-                    getHeight() * 0.49f,
+                    getHeight() * 0.51f,
                     paint
             );
 
@@ -487,6 +533,8 @@ public class MainActivity extends Activity {
                     candies.add(
                             createCandy()
                     );
+
+                    updateLevel();
 
                     invalidate();
 
