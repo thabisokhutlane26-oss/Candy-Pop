@@ -199,26 +199,25 @@ public class MainActivity extends Activity {
 
             Candy candy = new Candy();
 
-            candy.radius = 32 + random.nextInt(9);
+            candy.radius = 34 + random.nextInt(8);
 
             float safeWidth = Math.max(
                     1,
-                    getWidth() - 100
+                    getWidth() - 120
             );
 
             float safeHeight = Math.max(
                     1,
-                    getHeight() - 300
+                    getHeight() - 310
             );
 
             candy.x =
-                    50 +
-                    candy.radius +
+                    60 +
                     random.nextFloat() *
                     safeWidth;
 
             candy.y =
-                    175 +
+                    185 +
                     random.nextFloat() *
                     safeHeight;
 
@@ -229,7 +228,8 @@ public class MainActivity extends Activity {
                             )
                     ];
 
-            // Around 1 in 10 candies is a bomb.
+            candy.style = random.nextInt(3);
+
             candy.isBomb = random.nextInt(10) == 0;
 
             return candy;
@@ -277,6 +277,17 @@ public class MainActivity extends Activity {
                     getWidth() * 0.85f,
                     getHeight() * 0.65f,
                     160,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(40, 16, 70)
+            );
+
+            canvas.drawCircle(
+                    getWidth() * 0.55f,
+                    getHeight() * 0.88f,
+                    120,
                     paint
             );
         }
@@ -366,17 +377,36 @@ public class MainActivity extends Activity {
                 if (candy.isBomb) {
                     drawBomb(canvas, candy);
                 } else {
-                    drawNormalCandy(canvas, candy);
+
+                    if (candy.style == 0) {
+                        drawStripedCandy(canvas, candy);
+                    } else if (candy.style == 1) {
+                        drawWrappedCandy(canvas, candy);
+                    } else {
+                        drawRoundCandy(canvas, candy);
+                    }
                 }
             }
         }
 
-        private void drawNormalCandy(
+        private void drawRoundCandy(
                 Canvas canvas,
                 Candy candy
         ) {
 
             paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(
+                    darken(candy.color)
+            );
+
+            canvas.drawCircle(
+                    candy.x + 2,
+                    candy.y + 4,
+                    candy.radius + 2,
+                    paint
+            );
+
             paint.setColor(candy.color);
 
             canvas.drawCircle(
@@ -388,7 +418,7 @@ public class MainActivity extends Activity {
 
             paint.setColor(
                     Color.argb(
-                            220,
+                            210,
                             255,
                             255,
                             255
@@ -399,36 +429,31 @@ public class MainActivity extends Activity {
                     candy.x -
                             candy.radius * 0.32f,
                     candy.y -
-                            candy.radius * 0.32f,
-                    candy.radius * 0.18f,
+                            candy.radius * 0.35f,
+                    candy.radius * 0.20f,
                     paint
             );
 
             paint.setColor(
                     Color.argb(
-                            100,
+                            90,
                             255,
                             255,
                             255
                     )
             );
 
-            paint.setStrokeWidth(5);
-
-            canvas.drawLine(
-                    candy.x -
-                            candy.radius * 0.65f,
-                    candy.y +
-                            candy.radius * 0.35f,
+            canvas.drawCircle(
                     candy.x +
-                            candy.radius * 0.45f,
-                    candy.y -
-                            candy.radius * 0.45f,
+                            candy.radius * 0.25f,
+                    candy.y +
+                            candy.radius * 0.25f,
+                    candy.radius * 0.42f,
                     paint
             );
         }
 
-        private void drawBomb(
+        private void drawStripedCandy(
                 Canvas canvas,
                 Candy candy
         ) {
@@ -436,7 +461,73 @@ public class MainActivity extends Activity {
             paint.setStyle(Paint.Style.FILL);
 
             paint.setColor(
-                    Color.rgb(35, 35, 45)
+                    darken(candy.color)
+            );
+
+            canvas.drawRoundRect(
+                    candy.x - candy.radius,
+                    candy.y - candy.radius * 0.78f,
+                    candy.x + candy.radius,
+                    candy.y + candy.radius * 0.78f,
+                    candy.radius,
+                    candy.radius,
+                    paint
+            );
+
+            paint.setColor(candy.color);
+
+            canvas.drawRoundRect(
+                    candy.x - candy.radius,
+                    candy.y - candy.radius * 0.85f,
+                    candy.x + candy.radius,
+                    candy.y + candy.radius * 0.85f,
+                    candy.radius,
+                    candy.radius,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.argb(
+                            120,
+                            255,
+                            255,
+                            255
+                    )
+            );
+
+            paint.setStrokeWidth(
+                    candy.radius * 0.22f
+            );
+
+            canvas.drawLine(
+                    candy.x - candy.radius * 0.70f,
+                    candy.y + candy.radius * 0.60f,
+                    candy.x + candy.radius * 0.70f,
+                    candy.y - candy.radius * 0.60f,
+                    paint
+            );
+
+            paint.setColor(Color.WHITE);
+
+            canvas.drawCircle(
+                    candy.x -
+                            candy.radius * 0.35f,
+                    candy.y -
+                            candy.radius * 0.35f,
+                    candy.radius * 0.15f,
+                    paint
+            );
+        }
+
+        private void drawWrappedCandy(
+                Canvas canvas,
+                Candy candy
+        ) {
+
+            paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(
+                    darken(candy.color)
             );
 
             canvas.drawCircle(
@@ -446,9 +537,22 @@ public class MainActivity extends Activity {
                     paint
             );
 
-            // Bomb shine
+            paint.setColor(candy.color);
+
+            canvas.drawCircle(
+                    candy.x,
+                    candy.y,
+                    candy.radius * 0.80f,
+                    paint
+            );
+
             paint.setColor(
-                    Color.rgb(100, 100, 115)
+                    Color.argb(
+                            210,
+                            255,
+                            255,
+                            255
+                    )
             );
 
             canvas.drawCircle(
@@ -460,47 +564,120 @@ public class MainActivity extends Activity {
                     paint
             );
 
-            // Bomb fuse
             paint.setColor(
-                    Color.rgb(255, 193, 7)
+                    Color.argb(
+                            170,
+                            255,
+                            255,
+                            255
+                    )
             );
 
-            paint.setStrokeWidth(6);
             paint.setStyle(Paint.Style.STROKE);
-
-            canvas.drawLine(
-                    candy.x,
-                    candy.y -
-                            candy.radius,
-                    candy.x +
-                            candy.radius * 0.35f,
-                    candy.y -
-                            candy.radius * 1.35f,
-                    paint
-            );
-
-            // Bomb center
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(
-                    Color.rgb(255, 64, 129)
-            );
+            paint.setStrokeWidth(3);
 
             canvas.drawCircle(
                     candy.x,
                     candy.y,
-                    candy.radius * 0.38f,
+                    candy.radius * 0.55f,
+                    paint
+            );
+
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private int darken(int color) {
+
+            int r = Color.red(color);
+            int g = Color.green(color);
+            int b = Color.blue(color);
+
+            r = (int) (r * 0.72f);
+            g = (int) (g * 0.72f);
+            b = (int) (b * 0.72f);
+
+            return Color.rgb(r, g, b);
+        }
+
+        private void drawBomb(
+                Canvas canvas,
+                Candy bomb
+        ) {
+
+            paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(
+                    Color.rgb(18, 18, 25)
+            );
+
+            canvas.drawCircle(
+                    bomb.x + 2,
+                    bomb.y + 4,
+                    bomb.radius + 3,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(45, 45, 58)
+            );
+
+            canvas.drawCircle(
+                    bomb.x,
+                    bomb.y,
+                    bomb.radius,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(255, 70, 110)
+            );
+
+            canvas.drawCircle(
+                    bomb.x,
+                    bomb.y,
+                    bomb.radius * 0.43f,
                     paint
             );
 
             paint.setColor(Color.WHITE);
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(candy.radius * 0.45f);
+            paint.setTextSize(
+                    bomb.radius * 0.55f
+            );
 
             canvas.drawText(
                     "!",
-                    candy.x,
-                    candy.y +
-                            candy.radius * 0.15f,
+                    bomb.x,
+                    bomb.y +
+                            bomb.radius * 0.19f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(255, 193, 7)
+            );
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(6);
+
+            canvas.drawLine(
+                    bomb.x,
+                    bomb.y - bomb.radius,
+                    bomb.x + bomb.radius * 0.38f,
+                    bomb.y - bomb.radius * 1.32f,
+                    paint
+            );
+
+            paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(
+                    Color.rgb(255, 235, 59)
+            );
+
+            canvas.drawCircle(
+                    bomb.x + bomb.radius * 0.43f,
+                    bomb.y - bomb.radius * 1.38f,
+                    6,
                     paint
             );
         }
@@ -761,6 +938,7 @@ public class MainActivity extends Activity {
             float radius;
 
             int color;
+            int style;
             boolean isBomb;
         }
     }
