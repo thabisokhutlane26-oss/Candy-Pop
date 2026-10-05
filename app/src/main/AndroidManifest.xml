@@ -3,7 +3,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="Candy Pop"
+        android:label="CandyJolt"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
