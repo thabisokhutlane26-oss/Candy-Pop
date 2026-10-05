@@ -44,6 +44,9 @@ public class MainActivity extends Activity {
         private int timeLeft = 60;
         private int level = 1;
 
+        private int combo = 0;
+        private long lastTapTime = 0;
+
         private boolean gameOver = false;
 
         private final int[] candyColors = {
@@ -67,6 +70,7 @@ public class MainActivity extends Activity {
                         timeLeft = 0;
                         gameOver = true;
 
+                        combo = 0;
                         saveHighScore();
                     }
 
@@ -119,6 +123,8 @@ public class MainActivity extends Activity {
             score = 0;
             timeLeft = 60;
             level = 1;
+            combo = 0;
+            lastTapTime = 0;
             gameOver = false;
 
             candies.clear();
@@ -151,6 +157,44 @@ public class MainActivity extends Activity {
                     candies.add(createCandy());
                 }
             }
+        }
+
+        private void updateCombo() {
+
+            long now = System.currentTimeMillis();
+
+            if (lastTapTime == 0 ||
+                    now - lastTapTime <= 2000) {
+
+                combo++;
+
+            } else {
+
+                combo = 1;
+            }
+
+            lastTapTime = now;
+        }
+
+        private int getPointsForTap() {
+
+            if (combo >= 10) {
+                return 50;
+            }
+
+            if (combo >= 7) {
+                return 40;
+            }
+
+            if (combo >= 5) {
+                return 30;
+            }
+
+            if (combo >= 3) {
+                return 20;
+            }
+
+            return 10;
         }
 
         private Candy createCandy() {
@@ -257,7 +301,7 @@ public class MainActivity extends Activity {
                     paint
             );
 
-            paint.setTextSize(18);
+            paint.setTextSize(17);
 
             paint.setColor(
                     Color.rgb(255, 220, 80)
@@ -265,7 +309,18 @@ public class MainActivity extends Activity {
 
             canvas.drawText(
                     "SCORE: " + score,
-                    getWidth() * 0.20f,
+                    getWidth() * 0.17f,
+                    105,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(255, 100, 170)
+            );
+
+            canvas.drawText(
+                    "COMBO x" + combo,
+                    getWidth() * 0.50f,
                     105,
                     paint
             );
@@ -276,7 +331,7 @@ public class MainActivity extends Activity {
 
             canvas.drawText(
                     "TIME: " + timeLeft,
-                    getWidth() * 0.50f,
+                    getWidth() * 0.83f,
                     105,
                     paint
             );
@@ -287,8 +342,8 @@ public class MainActivity extends Activity {
 
             canvas.drawText(
                     "LEVEL: " + level,
-                    getWidth() * 0.80f,
-                    105,
+                    getWidth() / 2f,
+                    135,
                     paint
             );
 
@@ -298,7 +353,7 @@ public class MainActivity extends Activity {
             canvas.drawText(
                     "Tap the candies!",
                     getWidth() / 2f,
-                    140,
+                    160,
                     paint
             );
         }
@@ -526,7 +581,9 @@ public class MainActivity extends Activity {
                 if (distance <=
                         candy.radius + 20) {
 
-                    score += 10;
+                    updateCombo();
+
+                    score += getPointsForTap();
 
                     candies.remove(i);
 
