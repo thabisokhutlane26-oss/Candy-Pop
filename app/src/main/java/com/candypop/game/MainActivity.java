@@ -36,7 +36,6 @@ public class MainActivity extends Activity {
         private final Handler handler = new Handler();
 
         private final ArrayList<Candy> candies = new ArrayList<>();
-
         private final SharedPreferences preferences;
 
         private int score = 0;
@@ -69,7 +68,6 @@ public class MainActivity extends Activity {
                     if (timeLeft <= 0) {
                         timeLeft = 0;
                         gameOver = true;
-
                         combo = 0;
                         saveHighScore();
                     }
@@ -231,6 +229,9 @@ public class MainActivity extends Activity {
                             )
                     ];
 
+            // Around 1 in 10 candies is a bomb.
+            candy.isBomb = random.nextInt(10) == 0;
+
             return candy;
         }
 
@@ -362,57 +363,192 @@ public class MainActivity extends Activity {
 
             for (Candy candy : candies) {
 
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(candy.color);
-
-                canvas.drawCircle(
-                        candy.x,
-                        candy.y,
-                        candy.radius,
-                        paint
-                );
-
-                paint.setColor(
-                        Color.argb(
-                                220,
-                                255,
-                                255,
-                                255
-                        )
-                );
-
-                canvas.drawCircle(
-                        candy.x -
-                                candy.radius * 0.32f,
-                        candy.y -
-                                candy.radius * 0.32f,
-                        candy.radius * 0.18f,
-                        paint
-                );
-
-                paint.setColor(
-                        Color.argb(
-                                100,
-                                255,
-                                255,
-                                255
-                        )
-                );
-
-                paint.setStrokeWidth(5);
-
-                canvas.drawLine(
-                        candy.x -
-                                candy.radius * 0.65f,
-                        candy.y +
-                                candy.radius * 0.35f,
-                        candy.x +
-                                candy.radius * 0.45f,
-                        candy.y -
-                                candy.radius * 0.45f,
-                        paint
-                );
+                if (candy.isBomb) {
+                    drawBomb(canvas, candy);
+                } else {
+                    drawNormalCandy(canvas, candy);
+                }
             }
+        }
+
+        private void drawNormalCandy(
+                Canvas canvas,
+                Candy candy
+        ) {
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(candy.color);
+
+            canvas.drawCircle(
+                    candy.x,
+                    candy.y,
+                    candy.radius,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.argb(
+                            220,
+                            255,
+                            255,
+                            255
+                    )
+            );
+
+            canvas.drawCircle(
+                    candy.x -
+                            candy.radius * 0.32f,
+                    candy.y -
+                            candy.radius * 0.32f,
+                    candy.radius * 0.18f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.argb(
+                            100,
+                            255,
+                            255,
+                            255
+                    )
+            );
+
+            paint.setStrokeWidth(5);
+
+            canvas.drawLine(
+                    candy.x -
+                            candy.radius * 0.65f,
+                    candy.y +
+                            candy.radius * 0.35f,
+                    candy.x +
+                            candy.radius * 0.45f,
+                    candy.y -
+                            candy.radius * 0.45f,
+                    paint
+            );
+        }
+
+        private void drawBomb(
+                Canvas canvas,
+                Candy candy
+        ) {
+
+            paint.setStyle(Paint.Style.FILL);
+
+            paint.setColor(
+                    Color.rgb(35, 35, 45)
+            );
+
+            canvas.drawCircle(
+                    candy.x,
+                    candy.y,
+                    candy.radius,
+                    paint
+            );
+
+            // Bomb shine
+            paint.setColor(
+                    Color.rgb(100, 100, 115)
+            );
+
+            canvas.drawCircle(
+                    candy.x -
+                            candy.radius * 0.30f,
+                    candy.y -
+                            candy.radius * 0.30f,
+                    candy.radius * 0.17f,
+                    paint
+            );
+
+            // Bomb fuse
+            paint.setColor(
+                    Color.rgb(255, 193, 7)
+            );
+
+            paint.setStrokeWidth(6);
+            paint.setStyle(Paint.Style.STROKE);
+
+            canvas.drawLine(
+                    candy.x,
+                    candy.y -
+                            candy.radius,
+                    candy.x +
+                            candy.radius * 0.35f,
+                    candy.y -
+                            candy.radius * 1.35f,
+                    paint
+            );
+
+            // Bomb center
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(
+                    Color.rgb(255, 64, 129)
+            );
+
+            canvas.drawCircle(
+                    candy.x,
+                    candy.y,
+                    candy.radius * 0.38f,
+                    paint
+            );
+
+            paint.setColor(Color.WHITE);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(candy.radius * 0.45f);
+
+            canvas.drawText(
+                    "!",
+                    candy.x,
+                    candy.y +
+                            candy.radius * 0.15f,
+                    paint
+            );
+        }
+
+        private void explodeBomb(Candy bomb) {
+
+            float explosionRadius =
+                    bomb.radius * 3.5f;
+
+            ArrayList<Candy> toRemove =
+                    new ArrayList<>();
+
+            for (Candy candy : candies) {
+
+                if (candy == bomb) {
+                    continue;
+                }
+
+                float dx =
+                        candy.x - bomb.x;
+
+                float dy =
+                        candy.y - bomb.y;
+
+                float distance =
+                        (float) Math.sqrt(
+                                dx * dx +
+                                dy * dy
+                        );
+
+                if (distance <= explosionRadius) {
+                    toRemove.add(candy);
+                }
+            }
+
+            for (Candy candy : toRemove) {
+                candies.remove(candy);
+            }
+
+            score += 50;
+
+            combo++;
+
+            while (candies.size() < 15) {
+                candies.add(createCandy());
+            }
+
+            updateLevel();
         }
 
         private void drawGameOver(Canvas canvas) {
@@ -581,18 +717,26 @@ public class MainActivity extends Activity {
                 if (distance <=
                         candy.radius + 20) {
 
-                    updateCombo();
+                    if (candy.isBomb) {
 
-                    score += getPointsForTap();
+                        explodeBomb(candy);
 
-                    candies.remove(i);
+                    } else {
 
-                    candies.add(
-                            createCandy()
-                    );
+                        updateCombo();
 
-                    updateLevel();
+                        score += getPointsForTap();
 
+                        candies.remove(i);
+
+                        candies.add(
+                                createCandy()
+                        );
+
+                        updateLevel();
+                    }
+
+                    saveHighScore();
                     invalidate();
 
                     break;
@@ -617,6 +761,7 @@ public class MainActivity extends Activity {
             float radius;
 
             int color;
+            boolean isBomb;
         }
     }
 }
