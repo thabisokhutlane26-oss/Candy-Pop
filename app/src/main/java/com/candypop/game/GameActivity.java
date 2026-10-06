@@ -1,11 +1,14 @@
 package com.candypop.game;
 
 import android.app.Activity;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
 
 public class GameActivity extends Activity {
+
+    private MediaPlayer musicPlayer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,6 +21,45 @@ public class GameActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
 
+        musicPlayer = MediaPlayer.create(
+                this,
+                R.raw.makiyoshida_art_under_the_blooms_cute_cat_marimba_rhythm_535821_1
+        );
+
+        if (musicPlayer != null) {
+            musicPlayer.setLooping(true);
+            musicPlayer.setVolume(0.45f, 0.45f);
+            musicPlayer.start();
+        }
+
         setContentView(new GameView(this));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if (musicPlayer != null && musicPlayer.isPlaying()) {
+            musicPlayer.pause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (musicPlayer != null) {
+            musicPlayer.start();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (musicPlayer != null) {
+            musicPlayer.release();
+            musicPlayer = null;
+        }
+
+        super.onDestroy();
     }
 }
