@@ -23,7 +23,7 @@ public class GameActivity extends Activity {
 
         musicPlayer = MediaPlayer.create(
                 this,
-                R.raw.makiyoshida_art_under_the_blooms_cute_cat_marimba_rhythm_535821_1
+                R.raw.candy_music
         );
 
         if (musicPlayer != null) {
