@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -17,11 +18,13 @@ public class GameView extends View {
     private static final int ROWS = 7;
     private static final int COLS = 7;
     private static final int CANDY_TYPES = 6;
+    private static final int MAX_LEVEL = 100;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hudPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final int[][] board = new int[ROWS][COLS];
     private final List<int[]> selected = new ArrayList<>();
@@ -32,6 +35,26 @@ public class GameView extends View {
     private float boardTop;
 
     private boolean drawing = false;
+
+    private int level = 1;
+    private int score = 0;
+    private int target;
+    private int collected = 0;
+    private int timeLeft;
+
+    private final Handler timerHandler = new Handler();
+
+    private final Runnable timerRunnable = new Runnable() {
+        @Override
+        public void run() {
+
+            if (timeLeft > 0) {
+                timeLeft--;
+                invalidate();
+                timerHandler.postDelayed(this, 1000);
+            }
+        }
+    };
 
     private final int[] candyColors = {
             Color.rgb(255, 70, 85),
@@ -63,17 +86,55 @@ public class GameView extends View {
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(3f);
 
+        hudPaint.setAntiAlias(true);
+        hudPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+
         createBoard();
+        setupLevel();
 
         setFocusable(true);
+
+        timerHandler.postDelayed(
+                timerRunnable,
+                1000
+        );
+    }
+
+    private void setupLevel() {
+
+        level = Math.max(
+                1,
+                Math.min(MAX_LEVEL, level)
+        );
+
+        target = 15 + (level * 3);
+
+        if (level <= 10) {
+            timeLeft = 90;
+        } else if (level <= 30) {
+            timeLeft = 80;
+        } else if (level <= 50) {
+            timeLeft = 70;
+        } else if (level <= 70) {
+            timeLeft = 60;
+        } else if (level <= 90) {
+            timeLeft = 55;
+        } else {
+            timeLeft = 50;
+        }
     }
 
     private void createBoard() {
 
         for (int row = 0; row < ROWS; row++) {
+
             for (int col = 0; col < COLS; col++) {
+
                 board[row][col] =
-                        (int) (Math.random() * CANDY_TYPES);
+                        (int) (
+                                Math.random()
+                                        * CANDY_TYPES
+                        );
             }
         }
     }
@@ -83,26 +144,45 @@ public class GameView extends View {
 
         super.onDraw(canvas);
 
-        canvas.drawColor(Color.rgb(255, 238, 249));
+        canvas.drawColor(
+                Color.rgb(255, 238, 249)
+        );
+
+        drawHud(canvas);
+
+        float topSpace =
+                Math.min(
+                        150f,
+                        getHeight() * 0.18f
+                );
+
+        float availableHeight =
+                getHeight() - topSpace;
 
         cellSize = Math.min(
                 getWidth() / (float) COLS,
-                getHeight() / (float) ROWS
+                availableHeight / (float) ROWS
         );
 
-        float boardWidth = cellSize * COLS;
-        float boardHeight = cellSize * ROWS;
+        float boardWidth =
+                cellSize * COLS;
+
+        float boardHeight =
+                cellSize * ROWS;
 
         boardLeft =
                 (getWidth() - boardWidth) / 2f;
 
         boardTop =
-                (getHeight() - boardHeight) / 2f;
+                topSpace
+                        + (availableHeight - boardHeight)
+                        / 2f;
 
         drawBoardBackground(canvas);
         drawBoard(canvas);
 
         if (drawing && selected.size() >= 2) {
+
             canvas.drawPath(
                     connectionPath,
                     linePaint
@@ -112,15 +192,184 @@ public class GameView extends View {
         drawSelection(canvas);
     }
 
-    private void drawBoardBackground(Canvas canvas) {
+    private void drawHud(Canvas canvas) {
 
-        paint.setColor(Color.argb(40, 124, 77, 255));
+        hudPaint.setTextAlign(
+                Paint.Align.CENTER
+        );
+
+        float width = getWidth();
+
+        float boxWidth =
+                width / 4f;
+
+        float boxHeight = 85f;
+
+        drawHudBox(
+                canvas,
+                boxWidth * 0.5f,
+                50,
+                boxWidth,
+                boxHeight,
+                "LEVEL",
+                String.valueOf(level),
+                Color.rgb(124, 77, 255)
+        );
+
+        drawHudBox(
+                canvas,
+                boxWidth * 1.5f,
+                50,
+                boxWidth,
+                boxHeight,
+                "SCORE",
+                String.valueOf(score),
+                Color.rgb(255, 105, 180)
+        );
+
+        drawHudBox(
+                canvas,
+                boxWidth * 2.5f,
+                50,
+                boxWidth,
+                boxHeight,
+                "TARGET",
+                String.valueOf(target),
+                Color.rgb(66, 165, 245)
+        );
+
+        int timerColor =
+                timeLeft <= 10
+                        ? Color.rgb(230, 40, 50)
+                        : Color.rgb(60, 190, 95);
+
+        drawHudBox(
+                canvas,
+                boxWidth * 3.5f,
+                50,
+                boxWidth,
+                boxHeight,
+                "TIME",
+                String.valueOf(timeLeft),
+                timerColor
+        );
+    }
+
+    private void drawHudBox(
+            Canvas canvas,
+            float centerX,
+            float centerY,
+            float width,
+            float height,
+            String label,
+            String value,
+            int color
+    ) {
+
+        paint.setColor(
+                Color.argb(
+                        235,
+                        255,
+                        255,
+                        255
+                )
+        );
+
+        RectF box = new RectF(
+                centerX - width / 2f + 5,
+                centerY - height / 2f + 5,
+                centerX + width / 2f + 5,
+                centerY + height / 2f + 5
+        );
+
+        canvas.drawRoundRect(
+                box,
+                20,
+                20,
+                shadowPaint
+        );
+
+        paint.setColor(
+                Color.WHITE
+        );
+
+        box = new RectF(
+                centerX - width / 2f,
+                centerY - height / 2f,
+                centerX + width / 2f,
+                centerY + height / 2f
+        );
+
+        canvas.drawRoundRect(
+                box,
+                20,
+                20,
+                paint
+        );
+
+        paint.setColor(color);
+
+        RectF stripe = new RectF(
+                centerX - width / 2f,
+                centerY - height / 2f,
+                centerX + width / 2f,
+                centerY - height / 2f + 9
+        );
+
+        canvas.drawRoundRect(
+                stripe,
+                20,
+                20,
+                paint
+        );
+
+        hudPaint.setColor(
+                Color.rgb(90, 70, 100)
+        );
+
+        hudPaint.setTextSize(13);
+
+        canvas.drawText(
+                label,
+                centerX,
+                centerY - 9,
+                hudPaint
+        );
+
+        hudPaint.setColor(color);
+
+        hudPaint.setTextSize(25);
+
+        canvas.drawText(
+                value,
+                centerX,
+                centerY + 20,
+                hudPaint
+        );
+    }
+
+    private void drawBoardBackground(
+            Canvas canvas
+    ) {
+
+        paint.setColor(
+                Color.argb(
+                        40,
+                        124,
+                        77,
+                        255
+                )
+        );
 
         RectF boardRect = new RectF(
                 boardLeft - 10,
                 boardTop - 10,
-                boardLeft + cellSize * COLS + 10,
-                boardTop + cellSize * ROWS + 10
+                boardLeft
+                        + cellSize * COLS
+                        + 10,
+                boardTop
+                        + cellSize * ROWS
+                        + 10
         );
 
         canvas.drawRoundRect(
@@ -165,12 +414,15 @@ public class GameView extends View {
             int type
     ) {
 
-        int color = candyColors[type];
+        int color =
+                candyColors[type];
 
-        float bodyWidth = radius * 1.55f;
-        float bodyHeight = radius * 1.65f;
+        float bodyWidth =
+                radius * 1.55f;
 
-        // Shadow
+        float bodyHeight =
+                radius * 1.65f;
+
         canvas.drawOval(
                 new RectF(
                         x - bodyWidth / 2f + 3,
@@ -181,10 +433,12 @@ public class GameView extends View {
                 shadowPaint
         );
 
-        // Wrapper ends
-        paint.setColor(darken(color, 0.78f));
+        paint.setColor(
+                darken(color, 0.78f)
+        );
 
-        Path leftWrapper = new Path();
+        Path leftWrapper =
+                new Path();
 
         leftWrapper.moveTo(
                 x - bodyWidth / 2f,
@@ -213,7 +467,8 @@ public class GameView extends View {
                 paint
         );
 
-        Path rightWrapper = new Path();
+        Path rightWrapper =
+                new Path();
 
         rightWrapper.moveTo(
                 x + bodyWidth / 2f,
@@ -242,7 +497,6 @@ public class GameView extends View {
                 paint
         );
 
-        // Candy body
         paint.setColor(color);
 
         RectF body = new RectF(
@@ -259,7 +513,6 @@ public class GameView extends View {
                 paint
         );
 
-        // Dark outline
         outlinePaint.setColor(
                 darken(color, 0.65f)
         );
@@ -271,18 +524,26 @@ public class GameView extends View {
                 outlinePaint
         );
 
-        // Candy stripes
         paint.setColor(
-                Color.argb(75, 255, 255, 255)
+                Color.argb(
+                        75,
+                        255,
+                        255,
+                        255
+                )
         );
 
         for (int i = -1; i <= 1; i++) {
 
             canvas.drawRoundRect(
                     new RectF(
-                            x + i * radius * 0.42f - 3,
+                            x
+                                    + i * radius * 0.42f
+                                    - 3,
                             y - bodyHeight * 0.34f,
-                            x + i * radius * 0.42f + 3,
+                            x
+                                    + i * radius * 0.42f
+                                    + 3,
                             y + bodyHeight * 0.34f
                     ),
                     4,
@@ -291,9 +552,13 @@ public class GameView extends View {
             );
         }
 
-        // Large shine
         paint.setColor(
-                Color.argb(185, 255, 255, 255)
+                Color.argb(
+                        185,
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawOval(
@@ -306,9 +571,13 @@ public class GameView extends View {
                 paint
         );
 
-        // Small shine
         paint.setColor(
-                Color.argb(120, 255, 255, 255)
+                Color.argb(
+                        120,
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawCircle(
@@ -319,25 +588,40 @@ public class GameView extends View {
         );
     }
 
-    private void drawSelection(Canvas canvas) {
+    private void drawSelection(
+            Canvas canvas
+    ) {
 
         if (!drawing) {
             return;
         }
 
-        paint.setStyle(Paint.Style.STROKE);
+        paint.setStyle(
+                Paint.Style.STROKE
+        );
+
         paint.setStrokeWidth(5f);
+
         paint.setColor(
-                Color.argb(180, 255, 255, 255)
+                Color.argb(
+                        180,
+                        255,
+                        255,
+                        255
+                )
         );
 
         for (int[] cell : selected) {
 
             float x =
-                    getCellCenterX(cell[1]);
+                    getCellCenterX(
+                            cell[1]
+                    );
 
             float y =
-                    getCellCenterY(cell[0]);
+                    getCellCenterY(
+                            cell[0]
+                    );
 
             canvas.drawCircle(
                     x,
@@ -347,11 +631,15 @@ public class GameView extends View {
             );
         }
 
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(
+                Paint.Style.FILL
+        );
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean onTouchEvent(
+            MotionEvent event
+    ) {
 
         float x = event.getX();
         float y = event.getY();
@@ -371,8 +659,12 @@ public class GameView extends View {
                     selected.add(first);
 
                     connectionPath.moveTo(
-                            getCellCenterX(first[1]),
-                            getCellCenterY(first[0])
+                            getCellCenterX(
+                                    first[1]
+                            ),
+                            getCellCenterY(
+                                    first[0]
+                            )
                     );
 
                     drawing = true;
@@ -384,7 +676,9 @@ public class GameView extends View {
 
             case MotionEvent.ACTION_MOVE:
 
-                if (!drawing || selected.isEmpty()) {
+                if (!drawing
+                        || selected.isEmpty()) {
+
                     return true;
                 }
 
@@ -401,13 +695,20 @@ public class GameView extends View {
                     if (current[0] != last[0]
                             || current[1] != last[1]) {
 
-                        if (isAdjacent(last, current)
+                        if (isAdjacent(
+                                last,
+                                current
+                        )
                                 && board[current[0]][current[1]]
                                 == board[last[0]][last[1]]) {
 
-                            if (!alreadySelected(current)) {
+                            if (!alreadySelected(
+                                    current
+                            )) {
 
-                                selected.add(current);
+                                selected.add(
+                                        current
+                                );
 
                                 connectionPath.lineTo(
                                         getCellCenterX(
@@ -433,11 +734,14 @@ public class GameView extends View {
                 if (drawing) {
 
                     if (selected.size() >= 3) {
+
                         removeSelected();
                     }
 
                     selected.clear();
+
                     connectionPath.reset();
+
                     drawing = false;
 
                     invalidate();
@@ -459,13 +763,21 @@ public class GameView extends View {
         }
 
         int col =
-                (int) ((x - boardLeft) / cellSize);
+                (int) (
+                        (x - boardLeft)
+                                / cellSize
+                );
 
         int row =
-                (int) ((y - boardTop) / cellSize);
+                (int) (
+                        (y - boardTop)
+                                / cellSize
+                );
 
-        if (row < 0 || row >= ROWS
-                || col < 0 || col >= COLS) {
+        if (row < 0
+                || row >= ROWS
+                || col < 0
+                || col >= COLS) {
 
             return null;
         }
@@ -482,22 +794,30 @@ public class GameView extends View {
     ) {
 
         int rowDistance =
-                Math.abs(a[0] - b[0]);
+                Math.abs(
+                        a[0] - b[0]
+                );
 
         int colDistance =
-                Math.abs(a[1] - b[1]);
+                Math.abs(
+                        a[1] - b[1]
+                );
 
-        return rowDistance + colDistance == 1;
+        return rowDistance
+                + colDistance == 1;
     }
 
     private boolean alreadySelected(
             int[] cell
     ) {
 
-        for (int[] selectedCell : selected) {
+        for (int[] selectedCell
+                : selected) {
 
-            if (selectedCell[0] == cell[0]
-                    && selectedCell[1] == cell[1]) {
+            if (selectedCell[0]
+                    == cell[0]
+                    && selectedCell[1]
+                    == cell[1]) {
 
                 return true;
             }
@@ -506,14 +826,18 @@ public class GameView extends View {
         return false;
     }
 
-    private float getCellCenterX(int col) {
+    private float getCellCenterX(
+            int col
+    ) {
 
         return boardLeft
                 + col * cellSize
                 + cellSize / 2f;
     }
 
-    private float getCellCenterY(int row) {
+    private float getCellCenterY(
+            int row
+    ) {
 
         return boardTop
                 + row * cellSize
@@ -522,23 +846,32 @@ public class GameView extends View {
 
     private void removeSelected() {
 
+        int matched =
+                selected.size();
+
         for (int[] cell : selected) {
 
-            board[cell[0]][cell[1]] = -1;
+            board[cell[0]][cell[1]] =
+                    -1;
         }
 
-        // Drop candies downward.
-        for (int col = 0; col < COLS; col++) {
+        score += matched * 10;
 
-            int writeRow = ROWS - 1;
+        collected += matched;
 
-            for (
-                    int row = ROWS - 1;
+        for (int col = 0;
+                col < COLS;
+                col++) {
+
+            int writeRow =
+                    ROWS - 1;
+
+            for (int row = ROWS - 1;
                     row >= 0;
-                    row--
-            ) {
+                    row--) {
 
-                if (board[row][col] != -1) {
+                if (board[row][col]
+                        != -1) {
 
                     board[writeRow][col] =
                             board[row][col];
@@ -547,7 +880,6 @@ public class GameView extends View {
                 }
             }
 
-            // Spawn new candies.
             while (writeRow >= 0) {
 
                 board[writeRow][col] =
@@ -559,6 +891,43 @@ public class GameView extends View {
                 writeRow--;
             }
         }
+
+        if (collected >= target) {
+
+            advanceLevel();
+        }
+    }
+
+    private void advanceLevel() {
+
+        if (level >= MAX_LEVEL) {
+
+            level = MAX_LEVEL;
+
+            score += 500;
+
+            collected = 0;
+
+            setupLevel();
+
+            createBoard();
+
+            invalidate();
+
+            return;
+        }
+
+        level++;
+
+        score += 100;
+
+        collected = 0;
+
+        setupLevel();
+
+        createBoard();
+
+        invalidate();
     }
 
     private int darken(
@@ -584,6 +953,20 @@ public class GameView extends View {
                                 * factor
                 );
 
-        return Color.rgb(r, g, b);
+        return Color.rgb(
+                r,
+                g,
+                b
+        );
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+
+        timerHandler.removeCallbacks(
+                timerRunnable
+        );
+
+        super.onDetachedFromWindow();
     }
 }
