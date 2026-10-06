@@ -21,7 +21,7 @@ public class GameView extends View {
 
     private static final int ROWS = 7;
     private static final int COLS = 7;
-    private static final int CANDY_TYPES = 6;
+    private static final int CANDY_TYPES = 10;
     private static final int MAX_LEVEL = 100;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -212,38 +212,62 @@ public class GameView extends View {
 
             case 0:
                 return new int[]{
-                        Color.rgb(255, 70, 85),
+                        Color.rgb(240, 75, 85),
                         Color.rgb(255, 125, 135)
                 };
 
             case 1:
                 return new int[]{
-                        Color.rgb(255, 185, 25),
-                        Color.rgb(255, 220, 100)
+                        Color.rgb(235, 45, 65),
+                        Color.rgb(255, 120, 135)
                 };
 
             case 2:
                 return new int[]{
-                        Color.rgb(60, 190, 95),
-                        Color.rgb(130, 230, 150)
+                        Color.rgb(125, 65, 190),
+                        Color.rgb(190, 125, 235)
                 };
 
             case 3:
                 return new int[]{
-                        Color.rgb(55, 145, 240),
-                        Color.rgb(130, 200, 255)
+                        Color.rgb(65, 160, 240),
+                        Color.rgb(150, 215, 255)
                 };
 
             case 4:
                 return new int[]{
-                        Color.rgb(175, 70, 205),
-                        Color.rgb(220, 145, 235)
+                        Color.rgb(105, 55, 30),
+                        Color.rgb(175, 105, 65)
+                };
+
+            case 5:
+                return new int[]{
+                        Color.rgb(245, 75, 160),
+                        Color.rgb(255, 165, 215)
+                };
+
+            case 6:
+                return new int[]{
+                        Color.rgb(245, 145, 55),
+                        Color.rgb(255, 215, 125)
+                };
+
+            case 7:
+                return new int[]{
+                        Color.rgb(220, 45, 50),
+                        Color.rgb(255, 125, 125)
+                };
+
+            case 8:
+                return new int[]{
+                        Color.rgb(195, 35, 55),
+                        Color.rgb(245, 100, 115)
                 };
 
             default:
                 return new int[]{
-                        Color.rgb(255, 105, 55),
-                        Color.rgb(255, 165, 120)
+                        Color.rgb(90, 190, 75),
+                        Color.rgb(170, 235, 120)
                 };
         }
     }
@@ -253,34 +277,34 @@ public class GameView extends View {
         switch (type) {
 
             case 0:
-                return Color.rgb(
-                        255, 70, 85
-                );
+                return Color.rgb(240, 75, 85);
 
             case 1:
-                return Color.rgb(
-                        255, 185, 25
-                );
+                return Color.rgb(235, 45, 65);
 
             case 2:
-                return Color.rgb(
-                        60, 190, 95
-                );
+                return Color.rgb(125, 65, 190);
 
             case 3:
-                return Color.rgb(
-                        55, 145, 240
-                );
+                return Color.rgb(65, 160, 240);
 
             case 4:
-                return Color.rgb(
-                        175, 70, 205
-                );
+                return Color.rgb(105, 55, 30);
+
+            case 5:
+                return Color.rgb(245, 75, 160);
+
+            case 6:
+                return Color.rgb(245, 145, 55);
+
+            case 7:
+                return Color.rgb(220, 45, 50);
+
+            case 8:
+                return Color.rgb(195, 35, 55);
 
             default:
-                return Color.rgb(
-                        255, 105, 55
-                );
+                return Color.rgb(90, 190, 75);
         }
     }
 
@@ -740,7 +764,7 @@ public class GameView extends View {
         float cy =
                 getCellCenterY(row);
 
-        float radius =
+        float size =
                 cellSize * 0.34f;
 
         boolean popping =
@@ -767,7 +791,7 @@ public class GameView extends View {
                     1f - progress * 0.9f;
         }
 
-        radius *= scale;
+        size *= scale;
 
         shadowPaint.setColor(
                 Color.argb(
@@ -781,46 +805,859 @@ public class GameView extends View {
         canvas.drawCircle(
                 cx + 2f,
                 cy + 4f,
-                radius,
+                size,
                 shadowPaint
         );
-
-        int[] colors =
-                getCandyColors(type);
 
         paint.setStyle(
                 Paint.Style.FILL
         );
 
-        paint.setColor(
-                colors[0]
-        );
-
-        canvas.drawCircle(
-                cx,
-                cy,
-                radius,
-                paint
-        );
-
-        paint.setColor(
-                colors[1]
-        );
-
-        canvas.drawCircle(
-                cx - radius * 0.28f,
-                cy - radius * 0.30f,
-                radius * 0.25f,
-                paint
+        outlinePaint.setStyle(
+                Paint.Style.STROKE
         );
 
         outlinePaint.setStrokeWidth(
                 2f
         );
 
+        /*
+         * 🍉 WATERMELON
+         */
+        if (type == 0) {
+
+            paint.setColor(
+                    Color.rgb(
+                            55,
+                            175,
+                            85
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy,
+                    size,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            240,
+                            75,
+                            85
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy,
+                    size * 0.82f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.BLACK
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx - size * 0.20f,
+                            cy - size * 0.35f,
+                            cx - size * 0.10f,
+                            cy - size * 0.12f
+                    ),
+                    paint
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx + size * 0.10f,
+                            cy - size * 0.20f,
+                            cx + size * 0.20f,
+                            cy + size * 0.03f
+                    ),
+                    paint
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx - size * 0.05f,
+                            cy + size * 0.12f,
+                            cx + size * 0.05f,
+                            cy + size * 0.35f
+                    ),
+                    paint
+            );
+        }
+
+        /*
+         * 🍓 STRAWBERRY
+         */
+        else if (type == 1) {
+
+            Path strawberry =
+                    new Path();
+
+            strawberry.moveTo(
+                    cx,
+                    cy + size
+            );
+
+            strawberry.cubicTo(
+                    cx - size * 1.05f,
+                    cy + size * 0.25f,
+                    cx - size * 0.75f,
+                    cy - size * 0.85f,
+                    cx,
+                    cy - size * 0.55f
+            );
+
+            strawberry.cubicTo(
+                    cx + size * 0.75f,
+                    cy - size * 0.85f,
+                    cx + size * 1.05f,
+                    cy + size * 0.25f,
+                    cx,
+                    cy + size
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            235,
+                            45,
+                            65
+                    )
+            );
+
+            canvas.drawPath(
+                    strawberry,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            45,
+                            170,
+                            70
+                    )
+            );
+
+            Path leaves =
+                    new Path();
+
+            leaves.moveTo(
+                    cx,
+                    cy - size * 0.55f
+            );
+
+            leaves.lineTo(
+                    cx - size * 0.55f,
+                    cy - size * 0.90f
+            );
+
+            leaves.lineTo(
+                    cx - size * 0.15f,
+                    cy - size * 0.30f
+            );
+
+            leaves.lineTo(
+                    cx,
+                    cy - size * 0.95f
+            );
+
+            leaves.lineTo(
+                    cx + size * 0.18f,
+                    cy - size * 0.30f
+            );
+
+            leaves.lineTo(
+                    cx + size * 0.60f,
+                    cy - size * 0.85f
+            );
+
+            leaves.close();
+
+            canvas.drawPath(
+                    leaves,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.WHITE
+            );
+
+            for (int i = -1;
+                 i <= 1;
+                 i++) {
+
+                canvas.drawOval(
+                        new RectF(
+                                cx
+                                        + i
+                                        * size
+                                        * 0.28f
+                                        - 2f,
+                                cy
+                                        - size
+                                        * 0.10f,
+                                cx
+                                        + i
+                                        * size
+                                        * 0.28f
+                                        + 2f,
+                                cy
+                                        + size
+                                        * 0.10f
+                        ),
+                        paint
+                );
+            }
+        }
+
+        /*
+         * 🍇 GRAPES
+         */
+        else if (type == 2) {
+
+            paint.setColor(
+                    Color.rgb(
+                            125,
+                            65,
+                            190
+                    )
+            );
+
+            float r =
+                    size * 0.34f;
+
+            canvas.drawCircle(
+                    cx,
+                    cy - size * 0.50f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx - size * 0.35f,
+                    cy - size * 0.18f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx + size * 0.35f,
+                    cy - size * 0.18f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx - size * 0.50f,
+                    cy + size * 0.20f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy + size * 0.20f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx + size * 0.50f,
+                    cy + size * 0.20f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx - size * 0.25f,
+                    cy + size * 0.55f,
+                    r,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx + size * 0.25f,
+                    cy + size * 0.55f,
+                    r,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            55,
+                            150,
+                            65
+                    )
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx - size * 0.20f,
+                            cy - size * 0.95f,
+                            cx + size * 0.35f,
+                            cy - size * 0.55f
+                    ),
+                    paint
+            );
+        }
+
+        /*
+         * 🍬 WRAPPED CANDY
+         */
+        else if (type == 3) {
+
+            paint.setColor(
+                    Color.rgb(
+                            65,
+                            160,
+                            240
+                    )
+            );
+
+            canvas.drawRoundRect(
+                    new RectF(
+                            cx - size * 0.65f,
+                            cy - size * 0.42f,
+                            cx + size * 0.65f,
+                            cy + size * 0.42f
+                    ),
+                    size * 0.18f,
+                    size * 0.18f,
+                    paint
+            );
+
+            Path leftWrap =
+                    new Path();
+
+            leftWrap.moveTo(
+                    cx - size * 0.60f,
+                    cy - size * 0.35f
+            );
+
+            leftWrap.lineTo(
+                    cx - size * 1.05f,
+                    cy - size * 0.70f
+            );
+
+            leftWrap.lineTo(
+                    cx - size * 0.90f,
+                    cy
+            );
+
+            leftWrap.lineTo(
+                    cx - size * 1.05f,
+                    cy + size * 0.70f
+            );
+
+            leftWrap.lineTo(
+                    cx - size * 0.60f,
+                    cy + size * 0.35f
+            );
+
+            leftWrap.close();
+
+            canvas.drawPath(
+                    leftWrap,
+                    paint
+            );
+
+            Path rightWrap =
+                    new Path();
+
+            rightWrap.moveTo(
+                    cx + size * 0.60f,
+                    cy - size * 0.35f
+            );
+
+            rightWrap.lineTo(
+                    cx + size * 1.05f,
+                    cy - size * 0.70f
+            );
+
+            rightWrap.lineTo(
+                    cx + size * 0.90f,
+                    cy
+            );
+
+            rightWrap.lineTo(
+                    cx + size * 1.05f,
+                    cy + size * 0.70f
+            );
+
+            rightWrap.lineTo(
+                    cx + size * 0.60f,
+                    cy + size * 0.35f
+            );
+
+            rightWrap.close();
+
+            canvas.drawPath(
+                    rightWrap,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.WHITE
+            );
+
+            canvas.drawCircle(
+                    cx - size * 0.25f,
+                    cy - size * 0.18f,
+                    size * 0.10f,
+                    paint
+            );
+        }
+
+        /*
+         * 🍫 CHOCOLATE
+         */
+        else if (type == 4) {
+
+            paint.setColor(
+                    Color.rgb(
+                            105,
+                            55,
+                            30
+                    )
+            );
+
+            canvas.drawRoundRect(
+                    new RectF(
+                            cx - size * 0.85f,
+                            cy - size * 0.65f,
+                            cx + size * 0.85f,
+                            cy + size * 0.65f
+                    ),
+                    size * 0.15f,
+                    size * 0.15f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            160,
+                            90,
+                            50
+                    )
+            );
+
+            float piece =
+                    size * 0.27f;
+
+            for (int r = -1;
+                 r <= 1;
+                 r++) {
+
+                for (int c = -1;
+                     c <= 1;
+                     c++) {
+
+                    canvas.drawRoundRect(
+                            new RectF(
+                                    cx
+                                            + c
+                                            * piece
+                                            * 1.8f
+                                            - piece,
+                                    cy
+                                            + r
+                                            * piece
+                                            * 1.7f
+                                            - piece,
+                                    cx
+                                            + c
+                                            * piece
+                                            * 1.8f
+                                            + piece,
+                                    cy
+                                            + r
+                                            * piece
+                                            * 1.7f
+                                            + piece
+                            ),
+                            4f,
+                            4f,
+                            paint
+                    );
+                }
+            }
+        }
+
+        /*
+         * 🍭 LOLLIPOP
+         */
+        else if (type == 5) {
+
+            paint.setColor(
+                    Color.WHITE
+            );
+
+            paint.setStrokeWidth(
+                    size * 0.14f
+            );
+
+            canvas.drawLine(
+                    cx,
+                    cy,
+                    cx,
+                    cy + size * 1.10f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            245,
+                            75,
+                            160
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy - size * 0.15f,
+                    size * 0.78f,
+                    paint
+            );
+
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
+            paint.setStrokeWidth(
+                    size * 0.12f
+            );
+
+            paint.setColor(
+                    Color.WHITE
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy - size * 0.15f,
+                    size * 0.50f,
+                    paint
+            );
+
+            paint.setStyle(
+                    Paint.Style.FILL
+            );
+        }
+
+        /*
+         * 🍡 DANGO
+         */
+        else if (type == 6) {
+
+            paint.setColor(
+                    Color.rgb(
+                            135,
+                            80,
+                            45
+                    )
+            );
+
+            paint.setStrokeWidth(
+                    size * 0.10f
+            );
+
+            canvas.drawLine(
+                    cx,
+                    cy - size * 0.95f,
+                    cx,
+                    cy + size * 0.95f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            255,
+                            125,
+                            160
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy - size * 0.55f,
+                    size * 0.34f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            255,
+                            230,
+                            185
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy,
+                    size * 0.34f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            105,
+                            190,
+                            105
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx,
+                    cy + size * 0.55f,
+                    size * 0.34f,
+                    paint
+            );
+        }
+
+        /*
+         * 🍎 RED APPLE
+         */
+        else if (type == 7) {
+
+            paint.setColor(
+                    Color.rgb(
+                            220,
+                            45,
+                            50
+                    )
+            );
+
+            Path apple =
+                    new Path();
+
+            apple.moveTo(
+                    cx,
+                    cy + size * 0.95f
+            );
+
+            apple.cubicTo(
+                    cx - size * 1.05f,
+                    cy + size * 0.25f,
+                    cx - size * 0.70f,
+                    cy - size * 0.75f,
+                    cx,
+                    cy - size * 0.35f
+            );
+
+            apple.cubicTo(
+                    cx + size * 0.70f,
+                    cy - size * 0.75f,
+                    cx + size * 1.05f,
+                    cy + size * 0.25f,
+                    cx,
+                    cy + size * 0.95f
+            );
+
+            canvas.drawPath(
+                    apple,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            75,
+                            125,
+                            45
+                    )
+            );
+
+            canvas.drawRect(
+                    cx - 3f,
+                    cy - size * 0.72f,
+                    cx + 3f,
+                    cy - size * 0.35f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            55,
+                            160,
+                            70
+                    )
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx,
+                            cy - size * 0.85f,
+                            cx + size * 0.55f,
+                            cy - size * 0.50f
+                    ),
+                    paint
+            );
+        }
+
+        /*
+         * 🍒 CHERRIES
+         */
+        else if (type == 8) {
+
+            paint.setColor(
+                    Color.rgb(
+                            60,
+                            145,
+                            65
+                    )
+            );
+
+            paint.setStrokeWidth(
+                    size * 0.08f
+            );
+
+            canvas.drawLine(
+                    cx - size * 0.20f,
+                    cy - size * 0.05f,
+                    cx - size * 0.45f,
+                    cy - size * 0.85f,
+                    paint
+            );
+
+            canvas.drawLine(
+                    cx + size * 0.20f,
+                    cy - size * 0.05f,
+                    cx + size * 0.45f,
+                    cy - size * 0.85f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            195,
+                            35,
+                            55
+                    )
+            );
+
+            canvas.drawCircle(
+                    cx - size * 0.35f,
+                    cy + size * 0.35f,
+                    size * 0.48f,
+                    paint
+            );
+
+            canvas.drawCircle(
+                    cx + size * 0.35f,
+                    cy + size * 0.35f,
+                    size * 0.48f,
+                    paint
+            );
+        }
+
+        /*
+         * 🍏 GREEN APPLE
+         */
+        else {
+
+            paint.setColor(
+                    Color.rgb(
+                            90,
+                            190,
+                            75
+                    )
+            );
+
+            Path apple =
+                    new Path();
+
+            apple.moveTo(
+                    cx,
+                    cy + size * 0.95f
+            );
+
+            apple.cubicTo(
+                    cx - size * 1.05f,
+                    cy + size * 0.25f,
+                    cx - size * 0.70f,
+                    cy - size * 0.75f,
+                    cx,
+                    cy - size * 0.35f
+            );
+
+            apple.cubicTo(
+                    cx + size * 0.70f,
+                    cy - size * 0.75f,
+                    cx + size * 1.05f,
+                    cy + size * 0.25f,
+                    cx,
+                    cy + size * 0.95f
+            );
+
+            canvas.drawPath(
+                    apple,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            75,
+                            125,
+                            45
+                    )
+            );
+
+            canvas.drawRect(
+                    cx - 3f,
+                    cy - size * 0.72f,
+                    cx + 3f,
+                    cy - size * 0.35f,
+                    paint
+            );
+
+            paint.setColor(
+                    Color.rgb(
+                            55,
+                            150,
+                            65
+                    )
+            );
+
+            canvas.drawOval(
+                    new RectF(
+                            cx,
+                            cy - size * 0.85f,
+                            cx + size * 0.55f,
+                            cy - size * 0.50f
+                    ),
+                    paint
+            );
+        }
+
+        /*
+         * Common candy highlight
+         */
+        paint.setColor(
+                Color.argb(
+                        120,
+                        255,
+                        255,
+                        255
+                )
+        );
+
+        canvas.drawCircle(
+                cx - size * 0.28f,
+                cy - size * 0.30f,
+                size * 0.13f,
+                paint
+        );
+
+        /*
+         * Common outline
+         */
         outlinePaint.setColor(
                 Color.argb(
-                        110,
+                        100,
                         255,
                         255,
                         255
@@ -830,7 +1667,7 @@ public class GameView extends View {
         canvas.drawCircle(
                 cx,
                 cy,
-                radius,
+                size,
                 outlinePaint
         );
     }
@@ -1469,23 +2306,6 @@ public class GameView extends View {
         }
     }
 
-    /*
-     * FIXED:
-     *
-     * A candy can now connect to any of its
-     * 8 surrounding cells.
-     *
-     * This allows:
-     * - horizontal
-     * - vertical
-     * - diagonal
-     * - sloping
-     * - L-shaped
-     * - zig-zag
-     * - U-shaped
-     * - staircase
-     * - winding paths
-     */
     private boolean isAdjacent(
             int[] a,
             int[] b
