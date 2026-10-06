@@ -65,10 +65,6 @@ public class GameView extends View {
     private float lastTouchX;
     private float lastTouchY;
 
-    /*
-     * Current finger position.
-     * Used only for the live preview line.
-     */
     private float currentFingerX;
     private float currentFingerY;
 
@@ -141,9 +137,6 @@ public class GameView extends View {
                         return;
                     }
 
-                    /*
-                     * Remove the selected candies.
-                     */
                     for (int[] cell : poppingCells) {
 
                         if (cell[0] >= 0
@@ -155,10 +148,6 @@ public class GameView extends View {
                         }
                     }
 
-                    /*
-                     * IMPORTANT:
-                     * Refill while poppingCells still exists.
-                     */
                     refillBoard();
 
                     poppingCells.clear();
@@ -167,10 +156,6 @@ public class GameView extends View {
 
                     invalidate();
 
-                    /*
-                     * Check the level after the board
-                     * has been refilled.
-                     */
                     if (score >= targetScore) {
 
                         levelComplete();
@@ -431,9 +416,6 @@ public class GameView extends View {
 
         super.onDraw(canvas);
 
-        /*
-         * Soft candy-pink background.
-         */
         canvas.drawColor(
                 Color.rgb(
                         255,
@@ -482,10 +464,6 @@ public class GameView extends View {
                 boardHeight
         );
 
-        /*
-         * Draw connection BEFORE candies so the
-         * selected candy remains clearly visible.
-         */
         if (selected.size() >= 2) {
 
             drawConnectionPath(canvas);
@@ -498,9 +476,6 @@ public class GameView extends View {
             drawSelection(canvas);
         }
 
-        /*
-         * Live finger preview.
-         */
         if (drawing
                 && selected.size() > 0) {
 
@@ -794,9 +769,6 @@ public class GameView extends View {
 
         radius *= scale;
 
-        /*
-         * Candy shadow.
-         */
         shadowPaint.setColor(
                 Color.argb(
                         45,
@@ -831,9 +803,6 @@ public class GameView extends View {
                 paint
         );
 
-        /*
-         * Candy highlight.
-         */
         paint.setColor(
                 colors[1]
         );
@@ -845,9 +814,6 @@ public class GameView extends View {
                 paint
         );
 
-        /*
-         * Outer candy outline.
-         */
         outlinePaint.setStrokeWidth(
                 2f
         );
@@ -922,9 +888,6 @@ public class GameView extends View {
                         connectionCandyType
                 );
 
-        /*
-         * Soft glow.
-         */
         lineGlowPaint.setColor(
                 Color.argb(
                         75,
@@ -946,9 +909,6 @@ public class GameView extends View {
                 lineGlowPaint
         );
 
-        /*
-         * Main connection.
-         */
         linePaint.setColor(
                 color
         );
@@ -989,10 +949,6 @@ public class GameView extends View {
             return;
         }
 
-        /*
-         * Only show the preview when the finger is
-         * actually near a valid next candy.
-         */
         if (!isAdjacent(
                 last,
                 fingerCell
@@ -1006,24 +962,17 @@ public class GameView extends View {
             return;
         }
 
+        int color =
+                getCandyColor(
+                        connectionCandyType
+                );
+
         linePaint.setColor(
                 Color.argb(
                         110,
-                        Color.red(
-                                getCandyColor(
-                                        connectionCandyType
-                                )
-                        ),
-                        Color.green(
-                                getCandyColor(
-                                        connectionCandyType
-                                )
-                        ),
-                        Color.blue(
-                                getCandyColor(
-                                        connectionCandyType
-                                )
-                        )
+                        Color.red(color),
+                        Color.green(color),
+                        Color.blue(color)
                 )
         );
 
@@ -1078,9 +1027,6 @@ public class GameView extends View {
                             board[cell[0]][cell[1]]
                     );
 
-            /*
-             * Selection glow.
-             */
             effectPaint.setStyle(
                     Paint.Style.STROKE
             );
@@ -1105,9 +1051,6 @@ public class GameView extends View {
                     effectPaint
             );
 
-            /*
-             * Small white center ring.
-             */
             effectPaint.setStrokeWidth(
                     2f
             );
@@ -1232,10 +1175,6 @@ public class GameView extends View {
                 currentFingerX = x;
                 currentFingerY = y;
 
-                /*
-                 * Process the REAL finger movement.
-                 * No automatic Manhattan routing.
-                 */
                 processTouchMovement(
                         lastTouchX,
                         lastTouchY,
@@ -1261,10 +1200,6 @@ public class GameView extends View {
                 currentFingerX = x;
                 currentFingerY = y;
 
-                /*
-                 * A valid connection requires the minimum
-                 * number of candies.
-                 */
                 if (selected.size()
                         >= minimumConnection) {
 
@@ -1303,14 +1238,6 @@ public class GameView extends View {
         return true;
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * This follows the actual finger trajectory.
-     *
-     * It does NOT calculate a horizontal-first or
-     * vertical-first route.
-     */
     private void processTouchMovement(
             float fromX,
             float fromY,
@@ -1330,10 +1257,6 @@ public class GameView extends View {
                                 + dy * dy
                 );
 
-        /*
-         * Very dense sampling makes fast swipes much
-         * less likely to skip a candy.
-         */
         float step =
                 Math.max(
                         2f,
@@ -1406,9 +1329,6 @@ public class GameView extends View {
                         selected.size() - 1
                 );
 
-        /*
-         * Still inside the current candy.
-         */
         if (sameCell(
                 last,
                 cell
@@ -1417,12 +1337,6 @@ public class GameView extends View {
             return;
         }
 
-        /*
-         * Backtracking:
-         *
-         * If the finger moves directly back over the
-         * previous candy, remove only the last candy.
-         */
         if (selected.size() >= 2) {
 
             int[] previous =
@@ -1441,20 +1355,6 @@ public class GameView extends View {
             }
         }
 
-        /*
-         * Every new candy MUST be directly adjacent.
-         *
-         * This allows:
-         *
-         * horizontal
-         * vertical
-         * L
-         * zig-zag
-         * U
-         * staircase
-         * winding paths
-         * multiple turns
-         */
         if (!isAdjacent(
                 last,
                 cell
@@ -1463,19 +1363,12 @@ public class GameView extends View {
             return;
         }
 
-        /*
-         * Only the original candy type can be connected.
-         */
         if (board[cell[0]][cell[1]]
                 != connectionCandyType) {
 
             return;
         }
 
-        /*
-         * Never select the same candy twice unless
-         * backtracking.
-         */
         if (alreadySelected(cell)) {
 
             return;
@@ -1517,9 +1410,6 @@ public class GameView extends View {
                 }
         );
 
-        /*
-         * Small connection sound.
-         */
         try {
 
             if (gameSound != null) {
@@ -1579,6 +1469,23 @@ public class GameView extends View {
         }
     }
 
+    /*
+     * FIXED:
+     *
+     * A candy can now connect to any of its
+     * 8 surrounding cells.
+     *
+     * This allows:
+     * - horizontal
+     * - vertical
+     * - diagonal
+     * - sloping
+     * - L-shaped
+     * - zig-zag
+     * - U-shaped
+     * - staircase
+     * - winding paths
+     */
     private boolean isAdjacent(
             int[] a,
             int[] b
@@ -1600,19 +1507,10 @@ public class GameView extends View {
                         a[1] - b[1]
                 );
 
-        /*
-         * Four-direction movement only:
-         *
-         * up
-         * down
-         * left
-         * right
-         *
-         * No diagonal jumps.
-         */
-        return rowDifference
-                        + colDifference
-                == 1;
+        return rowDifference <= 1
+                && colDifference <= 1
+                && (rowDifference != 0
+                || colDifference != 0);
     }
 
     private boolean alreadySelected(
@@ -1723,9 +1621,6 @@ public class GameView extends View {
                 connectionLength
                         * connectionLength;
 
-        /*
-         * Longer connections receive a better score.
-         */
         if (connectionLength >= 5) {
 
             points += 10;
@@ -1767,10 +1662,6 @@ public class GameView extends View {
 
         animating = true;
 
-        /*
-         * Keep the selected path visible during the
-         * short pop animation.
-         */
         selected.clear();
 
         connectionPath.reset();
@@ -1790,10 +1681,6 @@ public class GameView extends View {
 
     private void refillBoard() {
 
-        /*
-         * Gravity:
-         * move candies downward into empty spaces.
-         */
         for (int col = 0;
              col < COLS;
              col++) {
@@ -1814,9 +1701,6 @@ public class GameView extends View {
                 }
             }
 
-            /*
-             * Fill the empty spaces at the top.
-             */
             while (writeRow >= 0) {
 
                 board[writeRow][col] =
