@@ -9,12 +9,14 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -37,6 +39,7 @@ public class MainActivity extends Activity {
 
         if (gameView != null) {
             gameView.stopTimer();
+            gameView.releaseSound();
         }
     }
 
@@ -74,6 +77,8 @@ public class MainActivity extends Activity {
         private final Candy[][] board =
                 new Candy[ROWS][COLUMNS];
 
+        private ToneGenerator toneGenerator;
+
         private int currentLevel = 1;
         private int score = 0;
         private int highScore = 0;
@@ -95,21 +100,12 @@ public class MainActivity extends Activity {
         private boolean moving = false;
 
         private final int[] candyColors = {
-                Color.rgb(245, 72, 105),   // pink
-                Color.rgb(255, 190, 45),   // yellow
-                Color.rgb(80, 190, 105),   // green
-                Color.rgb(70, 145, 235),   // blue
-                Color.rgb(180, 90, 220),   // purple
-                Color.rgb(255, 125, 55)    // orange
-        };
-
-        private final String[] candyNames = {
-                "Heart",
-                "Lemon",
-                "Mint",
-                "Blueberry",
-                "Grape",
-                "Orange"
+                Color.rgb(245, 72, 105),
+                Color.rgb(255, 190, 45),
+                Color.rgb(80, 190, 105),
+                Color.rgb(70, 145, 235),
+                Color.rgb(180, 90, 220),
+                Color.rgb(255, 125, 55)
         };
 
         private final String[] playerNames = {
@@ -181,6 +177,15 @@ public class MainActivity extends Activity {
             vibrationOn =
                     prefs.getBoolean("vibration", true);
 
+            try {
+                toneGenerator = new ToneGenerator(
+                        AudioManager.STREAM_MUSIC,
+                        80
+                );
+            } catch (Exception ignored) {
+                toneGenerator = null;
+            }
+
             paint.setTypeface(
                     Typeface.create(
                             Typeface.DEFAULT,
@@ -189,6 +194,100 @@ public class MainActivity extends Activity {
             );
 
             setFocusable(true);
+        }
+
+        // =========================================================
+        // SOUND EFFECTS
+        // =========================================================
+
+        private void playSound(int toneType) {
+
+            if (!soundOn) {
+                return;
+            }
+
+            try {
+                if (toneGenerator != null) {
+                    toneGenerator.startTone(
+                            toneType,
+                            100
+                    );
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        private void playSwapSound() {
+            playSound(ToneGenerator.TONE_PROP_BEEP);
+        }
+
+        private void playMatchSound() {
+            playSound(ToneGenerator.TONE_PROP_ACK);
+        }
+
+        private void playComboSound() {
+            playSound(ToneGenerator.TONE_PROP_PROMPT);
+        }
+
+        private void playWinSound() {
+            playSound(ToneGenerator.TONE_PROP_BEEP2);
+
+            handler.postDelayed(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            playSound(
+                                    ToneGenerator.TONE_PROP_BEEP2
+                            );
+                        }
+                    },
+                    140
+            );
+        }
+
+        private void playGameOverSound() {
+            playSound(ToneGenerator.TONE_PROP_NACK);
+        }
+
+        private void vibrateCandy() {
+
+            if (!vibrationOn) {
+                return;
+            }
+
+            try {
+                performHapticFeedback(
+                        HapticFeedbackConstants.VIRTUAL_KEY,
+                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        private void vibrateCombo() {
+
+            if (!vibrationOn) {
+                return;
+            }
+
+            try {
+                performHapticFeedback(
+                        HapticFeedbackConstants.LONG_PRESS,
+                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        public void releaseSound() {
+
+            try {
+                if (toneGenerator != null) {
+                    toneGenerator.release();
+                    toneGenerator = null;
+                }
+            } catch (Exception ignored) {
+            }
         }
 
         // =========================================================
@@ -730,7 +829,7 @@ public class MainActivity extends Activity {
         }
 
         // =========================================================
-        // REAL CANDY DRAWING
+        // CANDY DRAWING
         // =========================================================
 
         private void drawCandyTile(
@@ -788,9 +887,6 @@ public class MainActivity extends Activity {
                             candyColors.length
                     ];
 
-            paint.setColor(color);
-
-            // soft shadow
             paint.setColor(
                     Color.argb(
                             45,
@@ -810,8 +906,6 @@ public class MainActivity extends Activity {
             paint.setColor(color);
 
             if (shape == 0) {
-
-                // HEART CANDY
 
                 Path heart =
                         new Path();
@@ -848,8 +942,6 @@ public class MainActivity extends Activity {
 
             } else if (shape == 1) {
 
-                // ROUND LOLLIPOP CANDY
-
                 canvas.drawCircle(
                         cx,
                         cy,
@@ -877,8 +969,6 @@ public class MainActivity extends Activity {
                 );
 
             } else if (shape == 2) {
-
-                // WRAPPED CANDY
 
                 Path left =
                         new Path();
@@ -966,8 +1056,6 @@ public class MainActivity extends Activity {
 
             } else if (shape == 3) {
 
-                // STAR CANDY
-
                 Path star =
                         new Path();
 
@@ -1005,9 +1093,8 @@ public class MainActivity extends Activity {
                         star,
                         paint
                 );
-            } else if (shape == 4) {
 
-                // GEM CANDY
+            } else if (shape == 4) {
 
                 Path gem =
                         new Path();
@@ -1043,9 +1130,8 @@ public class MainActivity extends Activity {
                         gem,
                         paint
                 );
-            } else {
 
-                // ROUND CANDY
+            } else {
 
                 canvas.drawCircle(
                         cx,
@@ -1053,18 +1139,7 @@ public class MainActivity extends Activity {
                         size,
                         paint
                 );
-
-                paint.setColor(Color.WHITE);
-
-                canvas.drawCircle(
-                        cx - size * .3f,
-                        cy - size * .3f,
-                        size * .16f,
-                        paint
-                );
             }
-
-            // candy shine
 
             paint.setColor(
                     Color.argb(
@@ -1295,13 +1370,12 @@ public class MainActivity extends Activity {
                     targetCol
             );
 
+            playSwapSound();
+
             Set<String> matches =
                     findMatches();
 
             if (matches.isEmpty()) {
-
-                // illegal move:
-                // swap back
 
                 swapCandies(
                         start.row,
@@ -1405,8 +1479,6 @@ public class MainActivity extends Activity {
             Set<String> matches =
                     new HashSet<>();
 
-            // horizontal
-
             for (int r = 0;
                  r < ROWS;
                  r++) {
@@ -1449,8 +1521,6 @@ public class MainActivity extends Activity {
                     start = end;
                 }
             }
-
-            // vertical
 
             for (int c = 0;
                  c < COLUMNS;
@@ -1516,6 +1586,14 @@ public class MainActivity extends Activity {
 
             combo++;
 
+            playMatchSound();
+            vibrateCandy();
+
+            if (combo >= 2) {
+                playComboSound();
+                vibrateCombo();
+            }
+
             int gained =
                     matches.size()
                             * 20
@@ -1551,9 +1629,6 @@ public class MainActivity extends Activity {
                     board[r][c] = null;
                 }
             }
-
-            // small pause creates a
-            // satisfying disappearance effect
 
             invalidate();
 
@@ -1766,6 +1841,9 @@ public class MainActivity extends Activity {
 
             if (won) {
 
+                playWinSound();
+                vibrateCombo();
+
                 int stars =
                         calculateStars();
 
@@ -1808,6 +1886,8 @@ public class MainActivity extends Activity {
                         SCREEN_COMPLETE;
 
             } else {
+
+                playGameOverSound();
 
                 screen =
                         SCREEN_GAMEOVER;
@@ -2417,7 +2497,7 @@ public class MainActivity extends Activity {
         }
 
         // =========================================================
-        // SETTINGS SCREEN DRAW
+        // SETTINGS SCREEN
         // =========================================================
 
         private void drawSettings(
@@ -3374,6 +3454,7 @@ public class MainActivity extends Activity {
         protected void onDetachedFromWindow() {
 
             stopTimer();
+            releaseSound();
 
             super.onDetachedFromWindow();
         }
