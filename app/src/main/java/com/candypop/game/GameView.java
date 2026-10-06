@@ -109,17 +109,40 @@ public class GameView extends View {
                 return;
             }
 
-            popProgress += 0.12f;
+            popProgress += 0.14f;
 
             if (popProgress >= 1f) {
 
-                animating = false;
+                popProgress = 1f;
 
-                poppingCells.clear();
+                /*
+                 * IMPORTANT:
+                 * Mark the selected cells as empty BEFORE
+                 * refilling the board.
+                 */
+                for (int[] cell : poppingCells) {
+
+                    board[cell[0]][cell[1]] = -1;
+                }
+
+                animating = false;
 
                 refillBoard();
 
+                poppingCells.clear();
+
                 invalidate();
+
+                /*
+                 * Check the level only after the candies
+                 * have actually disappeared and the board
+                 * has been refilled.
+                 */
+                if (collected >= target
+                        && longMatches >= requiredLongMatches) {
+
+                    levelComplete();
+                }
 
                 return;
             }
@@ -553,10 +576,18 @@ public class GameView extends View {
 
                 if (isPopping(row, col)) {
 
+                    /*
+                     * Start large and shrink toward zero.
+                     * This makes the candy visibly disappear.
+                     */
                     scale =
                             1f
-                                    + 0.35f
+                                    - 0.75f
                                     * popProgress;
+
+                    if (scale < 0.08f) {
+                        scale = 0.08f;
+                    }
                 }
 
                 drawCandy(
@@ -898,7 +929,8 @@ public class GameView extends View {
                 int[] first =
                         getCell(x, y);
 
-                if (first != null) {
+                if (first != null
+                        && board[first[0]][first[1]] >= 0) {
 
                     selected.add(first);
 
@@ -929,7 +961,8 @@ public class GameView extends View {
                 int[] current =
                         getCell(x, y);
 
-                if (current != null) {
+                if (current != null
+                        && board[current[0]][current[1]] >= 0) {
 
                     int[] last =
                             selected.get(
@@ -979,6 +1012,7 @@ public class GameView extends View {
                             >= minimumMatch) {
 
                         removeSelected();
+
                     } else {
 
                         comboCount = 0;
@@ -1165,42 +1199,14 @@ public class GameView extends View {
         animationHandler.post(
                 animationRunnable
         );
-
-        checkLevelCompleteAfterMatch();
-    }
-
-    private void checkLevelCompleteAfterMatch() {
-
-        boolean targetReached =
-                collected >= target;
-
-        boolean longMatchGoal =
-                longMatches >= requiredLongMatches;
-
-        if (targetReached
-                && longMatchGoal) {
-
-            animationHandler.removeCallbacks(
-                    animationRunnable
-            );
-
-            animating = false;
-
-            poppingCells.clear();
-
-            refillBoard();
-
-            levelComplete();
-        }
     }
 
     private void refillBoard() {
 
-        for (int[] cell : poppingCells) {
-
-            board[cell[0]][cell[1]] = -1;
-        }
-
+        /*
+         * Move existing candies downward.
+         * Empty cells are represented by -1.
+         */
         for (int col = 0;
                 col < COLS;
                 col++) {
@@ -1222,6 +1228,10 @@ public class GameView extends View {
                 }
             }
 
+            /*
+             * Fill all empty cells at the top
+             * with new candies.
+             */
             while (writeRow >= 0) {
 
                 board[writeRow][col] =
@@ -1234,12 +1244,14 @@ public class GameView extends View {
             }
         }
 
-        poppingCells.clear();
-
         invalidate();
     }
 
     private void levelComplete() {
+
+        if (gameFinished) {
+            return;
+        }
 
         gameFinished = true;
 
