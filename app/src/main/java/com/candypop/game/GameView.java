@@ -1,6 +1,8 @@
 package com.candypop.game;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -35,6 +37,7 @@ public class GameView extends View {
     private float boardTop;
 
     private boolean drawing = false;
+    private boolean gameFinished = false;
 
     private int level = 1;
     private int score = 0;
@@ -48,10 +51,28 @@ public class GameView extends View {
         @Override
         public void run() {
 
+            if (gameFinished) {
+                return;
+            }
+
             if (timeLeft > 0) {
+
                 timeLeft--;
+
                 invalidate();
-                timerHandler.postDelayed(this, 1000);
+
+                timerHandler.postDelayed(
+                        this,
+                        1000
+                );
+
+            } else {
+
+                gameFinished = true;
+
+                invalidate();
+
+                showTimeUpDialog();
             }
         }
     };
@@ -73,7 +94,9 @@ public class GameView extends View {
 
         shadowPaint.setAntiAlias(true);
         shadowPaint.setStyle(Paint.Style.FILL);
-        shadowPaint.setColor(Color.argb(55, 0, 0, 0));
+        shadowPaint.setColor(
+                Color.argb(55, 0, 0, 0)
+        );
 
         linePaint.setAntiAlias(true);
         linePaint.setStyle(Paint.Style.STROKE);
@@ -87,7 +110,9 @@ public class GameView extends View {
         outlinePaint.setStrokeWidth(3f);
 
         hudPaint.setAntiAlias(true);
-        hudPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        hudPaint.setTypeface(
+                android.graphics.Typeface.DEFAULT_BOLD
+        );
 
         createBoard();
         setupLevel();
@@ -104,10 +129,13 @@ public class GameView extends View {
 
         level = Math.max(
                 1,
-                Math.min(MAX_LEVEL, level)
+                Math.min(
+                        MAX_LEVEL,
+                        level
+                )
         );
 
-        target = 15 + (level * 3);
+        target = 15 + level * 3;
 
         if (level <= 10) {
             timeLeft = 90;
@@ -145,7 +173,11 @@ public class GameView extends View {
         super.onDraw(canvas);
 
         canvas.drawColor(
-                Color.rgb(255, 238, 249)
+                Color.rgb(
+                        255,
+                        238,
+                        249
+                )
         );
 
         drawHud(canvas);
@@ -171,17 +203,21 @@ public class GameView extends View {
                 cellSize * ROWS;
 
         boardLeft =
-                (getWidth() - boardWidth) / 2f;
+                (getWidth() - boardWidth)
+                        / 2f;
 
         boardTop =
                 topSpace
-                        + (availableHeight - boardHeight)
-                        / 2f;
+                        + (
+                        availableHeight
+                                - boardHeight
+                ) / 2f;
 
         drawBoardBackground(canvas);
         drawBoard(canvas);
 
-        if (drawing && selected.size() >= 2) {
+        if (drawing
+                && selected.size() >= 2) {
 
             canvas.drawPath(
                     connectionPath,
@@ -213,7 +249,11 @@ public class GameView extends View {
                 boxHeight,
                 "LEVEL",
                 String.valueOf(level),
-                Color.rgb(124, 77, 255)
+                Color.rgb(
+                        124,
+                        77,
+                        255
+                )
         );
 
         drawHudBox(
@@ -224,7 +264,11 @@ public class GameView extends View {
                 boxHeight,
                 "SCORE",
                 String.valueOf(score),
-                Color.rgb(255, 105, 180)
+                Color.rgb(
+                        255,
+                        105,
+                        180
+                )
         );
 
         drawHudBox(
@@ -235,13 +279,25 @@ public class GameView extends View {
                 boxHeight,
                 "TARGET",
                 String.valueOf(target),
-                Color.rgb(66, 165, 245)
+                Color.rgb(
+                        66,
+                        165,
+                        245
+                )
         );
 
         int timerColor =
                 timeLeft <= 10
-                        ? Color.rgb(230, 40, 50)
-                        : Color.rgb(60, 190, 95);
+                        ? Color.rgb(
+                        230,
+                        40,
+                        50
+                )
+                        : Color.rgb(
+                        60,
+                        190,
+                        95
+                );
 
         drawHudBox(
                 canvas,
@@ -266,34 +322,9 @@ public class GameView extends View {
             int color
     ) {
 
-        paint.setColor(
-                Color.argb(
-                        235,
-                        255,
-                        255,
-                        255
-                )
-        );
+        paint.setColor(Color.WHITE);
 
         RectF box = new RectF(
-                centerX - width / 2f + 5,
-                centerY - height / 2f + 5,
-                centerX + width / 2f + 5,
-                centerY + height / 2f + 5
-        );
-
-        canvas.drawRoundRect(
-                box,
-                20,
-                20,
-                shadowPaint
-        );
-
-        paint.setColor(
-                Color.WHITE
-        );
-
-        box = new RectF(
                 centerX - width / 2f,
                 centerY - height / 2f,
                 centerX + width / 2f,
@@ -309,22 +340,24 @@ public class GameView extends View {
 
         paint.setColor(color);
 
-        RectF stripe = new RectF(
-                centerX - width / 2f,
-                centerY - height / 2f,
-                centerX + width / 2f,
-                centerY - height / 2f + 9
-        );
-
         canvas.drawRoundRect(
-                stripe,
+                new RectF(
+                        box.left,
+                        box.top,
+                        box.right,
+                        box.top + 9
+                ),
                 20,
                 20,
                 paint
         );
 
         hudPaint.setColor(
-                Color.rgb(90, 70, 100)
+                Color.rgb(
+                        90,
+                        70,
+                        100
+                )
         );
 
         hudPaint.setTextSize(13);
@@ -434,7 +467,10 @@ public class GameView extends View {
         );
 
         paint.setColor(
-                darken(color, 0.78f)
+                darken(
+                        color,
+                        0.78f
+                )
         );
 
         Path leftWrapper =
@@ -514,7 +550,10 @@ public class GameView extends View {
         );
 
         outlinePaint.setColor(
-                darken(color, 0.65f)
+                darken(
+                        color,
+                        0.65f
+                )
         );
 
         canvas.drawRoundRect(
@@ -538,13 +577,19 @@ public class GameView extends View {
             canvas.drawRoundRect(
                     new RectF(
                             x
-                                    + i * radius * 0.42f
+                                    + i
+                                    * radius
+                                    * 0.42f
                                     - 3,
-                            y - bodyHeight * 0.34f,
+                            y - bodyHeight
+                                    * 0.34f,
                             x
-                                    + i * radius * 0.42f
+                                    + i
+                                    * radius
+                                    * 0.42f
                                     + 3,
-                            y + bodyHeight * 0.34f
+                            y + bodyHeight
+                                    * 0.34f
                     ),
                     4,
                     4,
@@ -563,27 +608,15 @@ public class GameView extends View {
 
         canvas.drawOval(
                 new RectF(
-                        x - bodyWidth * 0.28f,
-                        y - bodyHeight * 0.31f,
-                        x + bodyWidth * 0.02f,
-                        y - bodyHeight * 0.05f
+                        x - bodyWidth
+                                * 0.28f,
+                        y - bodyHeight
+                                * 0.31f,
+                        x + bodyWidth
+                                * 0.02f,
+                        y - bodyHeight
+                                * 0.05f
                 ),
-                paint
-        );
-
-        paint.setColor(
-                Color.argb(
-                        120,
-                        255,
-                        255,
-                        255
-                )
-        );
-
-        canvas.drawCircle(
-                x + bodyWidth * 0.23f,
-                y + bodyHeight * 0.25f,
-                radius * 0.09f,
                 paint
         );
     }
@@ -613,19 +646,9 @@ public class GameView extends View {
 
         for (int[] cell : selected) {
 
-            float x =
-                    getCellCenterX(
-                            cell[1]
-                    );
-
-            float y =
-                    getCellCenterY(
-                            cell[0]
-                    );
-
             canvas.drawCircle(
-                    x,
-                    y,
+                    getCellCenterX(cell[1]),
+                    getCellCenterY(cell[0]),
                     cellSize * 0.39f,
                     paint
             );
@@ -641,6 +664,10 @@ public class GameView extends View {
             MotionEvent event
     ) {
 
+        if (gameFinished) {
+            return true;
+        }
+
         float x = event.getX();
         float y = event.getY();
 
@@ -649,6 +676,7 @@ public class GameView extends View {
             case MotionEvent.ACTION_DOWN:
 
                 selected.clear();
+
                 connectionPath.reset();
 
                 int[] first =
@@ -700,27 +728,25 @@ public class GameView extends View {
                                 current
                         )
                                 && board[current[0]][current[1]]
-                                == board[last[0]][last[1]]) {
+                                == board[last[0]][last[1]]
+                                && !alreadySelected(
+                                current
+                        )) {
 
-                            if (!alreadySelected(
+                            selected.add(
                                     current
-                            )) {
+                            );
 
-                                selected.add(
-                                        current
-                                );
+                            connectionPath.lineTo(
+                                    getCellCenterX(
+                                            current[1]
+                                    ),
+                                    getCellCenterY(
+                                            current[0]
+                                    )
+                            );
 
-                                connectionPath.lineTo(
-                                        getCellCenterX(
-                                                current[1]
-                                        ),
-                                        getCellCenterY(
-                                                current[0]
-                                        )
-                                );
-
-                                invalidate();
-                            }
+                            invalidate();
                         }
                     }
                 }
@@ -734,7 +760,6 @@ public class GameView extends View {
                 if (drawing) {
 
                     if (selected.size() >= 3) {
-
                         removeSelected();
                     }
 
@@ -893,41 +918,173 @@ public class GameView extends View {
         }
 
         if (collected >= target) {
-
-            advanceLevel();
+            levelComplete();
         }
     }
 
-    private void advanceLevel() {
+    private void levelComplete() {
 
-        if (level >= MAX_LEVEL) {
+        gameFinished = true;
 
-            level = MAX_LEVEL;
+        timerHandler.removeCallbacks(
+                timerRunnable
+        );
 
-            score += 500;
+        int stars;
 
-            collected = 0;
-
-            setupLevel();
-
-            createBoard();
-
-            invalidate();
-
-            return;
+        if (timeLeft >= 60) {
+            stars = 3;
+        } else if (timeLeft >= 25) {
+            stars = 2;
+        } else {
+            stars = 1;
         }
 
-        level++;
+        score += stars * 100;
 
-        score += 100;
+        invalidate();
+
+        String starText;
+
+        if (stars == 3) {
+            starText = "⭐⭐⭐";
+        } else if (stars == 2) {
+            starText = "⭐⭐";
+        } else {
+            starText = "⭐";
+        }
+
+        new AlertDialog.Builder(
+                getContext()
+        )
+                .setTitle(
+                        "🎉 LEVEL COMPLETE!"
+                )
+                .setMessage(
+                        starText
+                                + "\n\n"
+                                + "Level "
+                                + level
+                                + " completed!\n\n"
+                                + "Score: "
+                                + score
+                )
+                .setCancelable(false)
+                .setPositiveButton(
+                        level >= MAX_LEVEL
+                                ? "FINISH"
+                                : "NEXT LEVEL",
+                        (dialog, which) -> {
+
+                            if (level >= MAX_LEVEL) {
+
+                                goHome();
+
+                            } else {
+
+                                level++;
+
+                                collected = 0;
+
+                                setupLevel();
+
+                                createBoard();
+
+                                gameFinished = false;
+
+                                timerHandler.postDelayed(
+                                        timerRunnable,
+                                        1000
+                                );
+
+                                invalidate();
+                            }
+                        }
+                )
+                .setNegativeButton(
+                        "HOME",
+                        (dialog, which) ->
+                                goHome()
+                )
+                .show();
+    }
+
+    private void showTimeUpDialog() {
+
+        new AlertDialog.Builder(
+                getContext()
+        )
+                .setTitle(
+                        "⏰ TIME'S UP!"
+                )
+                .setMessage(
+                        "You needed "
+                                + Math.max(
+                                0,
+                                target - collected
+                        )
+                                + " more candies.\n\n"
+                                + "Score: "
+                                + score
+                )
+                .setCancelable(false)
+                .setPositiveButton(
+                        "TRY AGAIN",
+                        (dialog, which) ->
+                                restartLevel()
+                )
+                .setNegativeButton(
+                        "HOME",
+                        (dialog, which) ->
+                                goHome()
+                )
+                .show();
+    }
+
+    private void restartLevel() {
+
+        timerHandler.removeCallbacks(
+                timerRunnable
+        );
+
+        score = 0;
 
         collected = 0;
 
-        setupLevel();
+        gameFinished = false;
 
         createBoard();
 
+        setupLevel();
+
+        timerHandler.postDelayed(
+                timerRunnable,
+                1000
+        );
+
         invalidate();
+    }
+
+    private void goHome() {
+
+        timerHandler.removeCallbacks(
+                timerRunnable
+        );
+
+        Context context = getContext();
+
+        Intent intent =
+                new Intent(
+                        context,
+                        MainActivity.class
+                );
+
+        context.startActivity(intent);
+
+        if (context instanceof Activity) {
+
+            ((Activity) context).finish();
+        }
     }
 
     private int darken(
