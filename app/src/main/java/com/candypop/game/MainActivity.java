@@ -3,150 +3,105 @@ package com.candypop.game;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.RectF;
-import android.graphics.Typeface;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
+import android.graphics.*;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.HapticFeedbackConstants;
+import android.os.Vibrator;
 import android.view.MotionEvent;
 import android.view.View;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    private CandyGameView gameView;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        gameView = new CandyGameView(this);
-        setContentView(gameView);
+        setContentView(new CandyJoltView(this));
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
+    static class CandyJoltView extends View {
 
-        if (gameView != null) {
-            gameView.stopTimer();
-            gameView.releaseSound();
-        }
-    }
+        static final int HOME = 0;
+        static final int LEVELS = 1;
+        static final int GAME = 2;
+        static final int COMPLETE = 3;
+        static final int GAMEOVER = 4;
+        static final int SETTINGS = 5;
+        static final int SCORES = 6;
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-        if (gameView != null) {
-            gameView.resumeTimerIfNeeded();
-        }
-    }
+        Random random = new Random();
+        Handler handler = new Handler();
+        SharedPreferences prefs;
 
-    public static class CandyGameView extends View {
+        int screen = HOME;
+        int level = 1;
+        int score = 0;
+        int bestScore = 0;
+        int timeLeft = 60;
+        int target = 20;
+        int collected = 0;
+        int combo = 0;
 
-        private static final int SCREEN_HOME = 0;
-        private static final int SCREEN_LEVELS = 1;
-        private static final int SCREEN_GAMEPLAY = 2;
-        private static final int SCREEN_COMPLETE = 3;
-        private static final int SCREEN_GAMEOVER = 4;
-        private static final int SCREEN_SETTINGS = 5;
-        private static final int SCREEN_SCORES = 6;
+        boolean paused = false;
+        boolean musicOn = true;
+        boolean soundOn = true;
+        boolean vibrationOn = true;
 
-        private static final int MAX_LEVEL = 30;
+        float downX, downY;
+        boolean moving;
 
-        private static final int ROWS = 7;
-        private static final int COLUMNS = 6;
+        static final int ROWS = 7;
+        static final int COLS = 7;
 
-        private int screen = SCREEN_HOME;
+        int[][] board = new int[ROWS][COLS];
 
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Random random = new Random();
-        private final Handler handler = new Handler();
-        private final SharedPreferences prefs;
-
-        private final Candy[][] board =
-                new Candy[ROWS][COLUMNS];
-
-        private ToneGenerator toneGenerator;
-
-        private int currentLevel = 1;
-        private int score = 0;
-        private int highScore = 0;
-        private int timeLeft = 60;
-        private int combo = 0;
-
-        private int target = 20;
-        private int collected = 0;
-
-        private boolean paused = false;
-
-        private boolean musicOn = true;
-        private boolean soundOn = true;
-        private boolean vibrationOn = true;
-
-        private float touchDownX;
-        private float touchDownY;
-
-        private boolean moving = false;
-
-        private final int[] candyColors = {
-                Color.rgb(245, 72, 105),
-                Color.rgb(255, 190, 45),
-                Color.rgb(80, 190, 105),
-                Color.rgb(70, 145, 235),
-                Color.rgb(180, 90, 220),
-                Color.rgb(255, 125, 55)
+        int[] candyColors = {
+                Color.rgb(255, 80, 110),
+                Color.rgb(80, 170, 255),
+                Color.rgb(255, 205, 60),
+                Color.rgb(90, 210, 120),
+                Color.rgb(180, 100, 245),
+                Color.rgb(255, 140, 55)
         };
 
-        private final String[] playerNames = {
-                "SweetPlayer",
-                "CandyMaster",
-                "JoltKing",
-                "SugarRush",
-                "CandyStar"
+        String[] candyNames = {
+                "Strawberry",
+                "Blueberry",
+                "Lemon",
+                "Apple",
+                "Grape",
+                "Orange"
         };
 
-        private final int[] sampleScores = {
-                2480,
-                2150,
-                1890,
-                1540,
-                1210
-        };
-
-        private final Runnable timerRunnable = new Runnable() {
+        Runnable timer = new Runnable() {
             @Override
             public void run() {
-
-                if (screen == SCREEN_GAMEPLAY && !paused) {
-
-                    if (timeLeft > 0) {
-                        timeLeft--;
-                    }
+                if (screen == GAME && !paused) {
+                    timeLeft--;
 
                     if (timeLeft <= 0) {
-                        finishGame(false);
-                        return;
+                        timeLeft = 0;
+                        if (collected >= target) {
+                            completeLevel();
+                        } else {
+                            screen = GAMEOVER;
+                        }
                     }
 
                     invalidate();
-
                     handler.postDelayed(this, 1000);
                 }
             }
         };
 
-        public CandyGameView(Context context) {
+        CandyJoltView(Context context) {
             super(context);
 
             prefs = context.getSharedPreferences(
@@ -154,3359 +109,933 @@ public class MainActivity extends Activity {
                     Context.MODE_PRIVATE
             );
 
-            highScore =
-                    prefs.getInt("highScore", 0);
+            bestScore = prefs.getInt("bestScore", 0);
+            level = prefs.getInt("level", 1);
 
-            currentLevel =
-                    prefs.getInt("currentLevel", 1);
+            musicOn = prefs.getBoolean("music", true);
+            soundOn = prefs.getBoolean("sound", true);
+            vibrationOn = prefs.getBoolean("vibration", true);
 
-            if (currentLevel < 1) {
-                currentLevel = 1;
-            }
-
-            if (currentLevel > MAX_LEVEL) {
-                currentLevel = MAX_LEVEL;
-            }
-
-            musicOn =
-                    prefs.getBoolean("music", true);
-
-            soundOn =
-                    prefs.getBoolean("sound", true);
-
-            vibrationOn =
-                    prefs.getBoolean("vibration", true);
-
-            try {
-                toneGenerator = new ToneGenerator(
-                        AudioManager.STREAM_MUSIC,
-                        80
-                );
-            } catch (Exception ignored) {
-                toneGenerator = null;
-            }
-
-            paint.setTypeface(
-                    Typeface.create(
-                            Typeface.DEFAULT,
-                            Typeface.BOLD
-                    )
-            );
-
-            setFocusable(true);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeWidth(4);
         }
 
-        // =========================================================
-        // SOUND EFFECTS
-        // =========================================================
-
-        private void playSound(int toneType) {
-
-            if (!soundOn) {
-                return;
-            }
-
-            try {
-                if (toneGenerator != null) {
-                    toneGenerator.startTone(
-                            toneType,
-                            100
-                    );
-                }
-            } catch (Exception ignored) {
-            }
+        void text(Canvas c, String s, float x, float y, float size, int color,
+                  Paint.Align align) {
+            p.setStyle(Paint.Style.FILL);
+            p.setTextSize(size);
+            p.setColor(color);
+            p.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            p.setTextAlign(align);
+            c.drawText(s, x, y, p);
         }
 
-        private void playSwapSound() {
-            playSound(ToneGenerator.TONE_PROP_BEEP);
+        void roundRect(Canvas c, float l, float t, float r, float b,
+                       float radius, int color) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(color);
+            c.drawRoundRect(l, t, r, b, radius, radius, p);
         }
-
-        private void playMatchSound() {
-            playSound(ToneGenerator.TONE_PROP_ACK);
-        }
-
-        private void playComboSound() {
-            playSound(ToneGenerator.TONE_PROP_PROMPT);
-        }
-
-        private void playWinSound() {
-            playSound(ToneGenerator.TONE_PROP_BEEP2);
-
-            handler.postDelayed(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            playSound(
-                                    ToneGenerator.TONE_PROP_BEEP2
-                            );
-                        }
-                    },
-                    140
-            );
-        }
-
-        private void playGameOverSound() {
-            playSound(ToneGenerator.TONE_PROP_NACK);
-        }
-
-        private void vibrateCandy() {
-
-            if (!vibrationOn) {
-                return;
-            }
-
-            try {
-                performHapticFeedback(
-                        HapticFeedbackConstants.VIRTUAL_KEY,
-                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                );
-            } catch (Exception ignored) {
-            }
-        }
-
-        private void vibrateCombo() {
-
-            if (!vibrationOn) {
-                return;
-            }
-
-            try {
-                performHapticFeedback(
-                        HapticFeedbackConstants.LONG_PRESS,
-                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                );
-            } catch (Exception ignored) {
-            }
-        }
-
-        public void releaseSound() {
-
-            try {
-                if (toneGenerator != null) {
-                    toneGenerator.release();
-                    toneGenerator = null;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        // =========================================================
-        // TIMER
-        // =========================================================
-
-        private void startTimer() {
-
-            handler.removeCallbacks(
-                    timerRunnable
-            );
-
-            handler.postDelayed(
-                    timerRunnable,
-                    1000
-            );
-        }
-
-        public void stopTimer() {
-
-            handler.removeCallbacks(
-                    timerRunnable
-            );
-        }
-
-        public void resumeTimerIfNeeded() {
-
-            if (screen == SCREEN_GAMEPLAY &&
-                    !paused) {
-
-                handler.removeCallbacks(
-                        timerRunnable
-                );
-
-                handler.postDelayed(
-                        timerRunnable,
-                        1000
-                );
-            }
-        }
-
-        // =========================================================
-        // DRAW
-        // =========================================================
 
         @Override
-        protected void onDraw(Canvas canvas) {
+        protected void onDraw(Canvas c) {
+            super.onDraw(c);
 
-            super.onDraw(canvas);
-
-            canvas.drawColor(
-                    Color.rgb(250, 244, 255)
-            );
+            c.drawColor(Color.rgb(255, 244, 250));
 
             switch (screen) {
-
-                case SCREEN_HOME:
-                    drawHome(canvas);
+                case HOME:
+                    drawHome(c);
                     break;
-
-                case SCREEN_LEVELS:
-                    drawLevels(canvas);
+                case LEVELS:
+                    drawLevels(c);
                     break;
-
-                case SCREEN_GAMEPLAY:
-                    drawGameplay(canvas);
+                case GAME:
+                    drawGame(c);
                     break;
-
-                case SCREEN_COMPLETE:
-                    drawComplete(canvas);
+                case COMPLETE:
+                    drawComplete(c);
                     break;
-
-                case SCREEN_GAMEOVER:
-                    drawGameOver(canvas);
+                case GAMEOVER:
+                    drawGameOver(c);
                     break;
-
-                case SCREEN_SETTINGS:
-                    drawSettings(canvas);
+                case SETTINGS:
+                    drawSettings(c);
                     break;
-
-                case SCREEN_SCORES:
-                    drawHighScores(canvas);
+                case SCORES:
+                    drawScores(c);
                     break;
             }
         }
 
-        // =========================================================
-        // HOME
-        // =========================================================
+        void drawHeader(Canvas c, String title) {
+            roundRect(c, 0, 0, getWidth(), 90, 0,
+                    Color.rgb(255, 92, 135));
 
-        private void drawHome(Canvas canvas) {
+            text(c, "CANDYJOLT", 25, 43, 25,
+                    Color.WHITE, Paint.Align.LEFT);
 
-            drawBackground(canvas);
-
-            drawTitle(
-                    canvas,
-                    "CandyJolt",
-                    getWidth() / 2f,
-                    105,
-                    42
-            );
-
-            drawText(
-                    canvas,
-                    "Small Game • Big Smiles",
-                    getWidth() / 2f,
-                    145,
-                    18,
-                    Color.DKGRAY,
-                    true
-            );
-
-            drawCandyLogo(canvas);
-
-            float center =
-                    getWidth() / 2f;
-
-            drawButton(
-                    canvas,
-                    "PLAY",
-                    center,
-                    390,
-                    250,
-                    65,
-                    Color.rgb(85, 190, 110)
-            );
-
-            drawButton(
-                    canvas,
-                    "LEVELS",
-                    center,
-                    475,
-                    250,
-                    65,
-                    Color.rgb(90, 145, 235)
-            );
-
-            drawButton(
-                    canvas,
-                    "HIGH SCORES",
-                    center,
-                    560,
-                    250,
-                    65,
-                    Color.rgb(180, 105, 220)
-            );
-
-            drawButton(
-                    canvas,
-                    "SETTINGS",
-                    center,
-                    645,
-                    250,
-                    65,
-                    Color.rgb(255, 165, 65)
-            );
-
-            drawMuteButton(canvas);
+            text(c, title, getWidth() - 25, 43, 18,
+                    Color.WHITE, Paint.Align.RIGHT);
         }
 
-        private void drawCandyLogo(Canvas canvas) {
+        void drawHome(Canvas c) {
+            text(c, "🍬", getWidth() / 2f - 60, 115, 55,
+                    Color.WHITE, Paint.Align.CENTER);
+            text(c, "🍭", getWidth() / 2f, 115, 55,
+                    Color.WHITE, Paint.Align.CENTER);
+            text(c, "🍬", getWidth() / 2f + 60, 115, 55,
+                    Color.WHITE, Paint.Align.CENTER);
 
-            float cx =
-                    getWidth() / 2f;
+            text(c, "CandyJolt", getWidth() / 2f, 175, 42,
+                    Color.rgb(245, 60, 105), Paint.Align.CENTER);
 
-            float cy = 245;
+            text(c, "Small Game • Big Smiles", getWidth() / 2f,
+                    205, 18, Color.DKGRAY, Paint.Align.CENTER);
 
-            drawRealCandy(
-                    canvas,
-                    cx - 70,
-                    cy,
-                    34,
-                    0,
-                    0
-            );
+            button(c, "PLAY", 80, 245, getWidth() - 80, 315,
+                    Color.rgb(70, 200, 105));
 
-            drawRealCandy(
-                    canvas,
-                    cx,
-                    cy - 20,
-                    34,
-                    1,
-                    1
-            );
+            button(c, "LEVELS", 80, 330, getWidth() - 80, 390,
+                    Color.rgb(80, 160, 245));
 
-            drawRealCandy(
-                    canvas,
-                    cx + 70,
-                    cy,
-                    34,
-                    2,
-                    2
-            );
+            button(c, "HIGH SCORES", 80, 405, getWidth() - 80, 465,
+                    Color.rgb(175, 100, 235));
+
+            button(c, "SETTINGS", 80, 480, getWidth() - 80, 540,
+                    Color.rgb(255, 165, 55));
+
+            text(c, musicOn ? "🔊" : "🔇",
+                    getWidth() - 40, 590, 28,
+                    Color.DKGRAY, Paint.Align.CENTER);
         }
 
-        // =========================================================
-        // LEVELS
-        // =========================================================
+        void button(Canvas c, String label, float l, float t,
+                    float r, float b, int color) {
+            roundRect(c, l, t, r, b, 25, color);
+            text(c, label, (l + r) / 2f,
+                    (t + b) / 2f + 8,
+                    21, Color.WHITE, Paint.Align.CENTER);
+        }
 
-        private void drawLevels(Canvas canvas) {
+        void drawLevels(Canvas c) {
+            drawHeader(c, "LEVELS");
 
-            drawBackground(canvas);
+            text(c, "Choose your level", getWidth() / 2f,
+                    125, 23, Color.DKGRAY, Paint.Align.CENTER);
 
-            drawHeader(
-                    canvas,
-                    "Level Select",
-                    true,
-                    true
-            );
+            int startY = 155;
+            int size = 75;
+            int gap = 12;
 
-            int cardW = 105;
-            int cardH = 82;
+            for (int i = 1; i <= 30; i++) {
+                int col = (i - 1) % 3;
+                int row = (i - 1) / 3;
 
-            int startY = 120;
-            int gapX = 15;
-            int gapY = 15;
+                float l = 25 + col * (size + gap);
+                float t = startY + row * (size + gap);
+                float r = l + size;
+                float b = t + size;
 
-            int totalW =
-                    cardW * 3 +
-                    gapX * 2;
+                boolean unlocked = i <= level;
 
-            int startX =
-                    (getWidth() - totalW) / 2;
-
-            for (int i = 1;
-                 i <= MAX_LEVEL;
-                 i++) {
-
-                int row =
-                        (i - 1) / 3;
-
-                int col =
-                        (i - 1) % 3;
-
-                float x =
-                        startX +
-                        col * (cardW + gapX);
-
-                float y =
-                        startY +
-                        row * (cardH + gapY);
-
-                boolean unlocked =
-                        i <= Math.min(
-                                currentLevel + 2,
-                                MAX_LEVEL
-                        );
-
-                drawLevelCard(
-                        canvas,
-                        i,
-                        x,
-                        y,
-                        cardW,
-                        cardH,
+                roundRect(c, l, t, r, b, 18,
                         unlocked
-                );
+                                ? Color.rgb(255, 185, 70)
+                                : Color.rgb(205, 205, 210));
+
+                text(c, unlocked ? "" + i : "🔒",
+                        (l + r) / 2f,
+                        (t + b) / 2f + 8,
+                        unlocked ? 25 : 20,
+                        Color.WHITE,
+                        Paint.Align.CENTER);
             }
 
-            drawText(
-                    canvas,
-                    "Complete levels to unlock more fun!",
-                    getWidth() / 2f,
-                    getHeight() - 25,
-                    14,
-                    Color.DKGRAY,
-                    true
-            );
+            text(c, "Complete levels to unlock more fun!",
+                    getWidth() / 2f, getHeight() - 25,
+                    15, Color.GRAY, Paint.Align.CENTER);
         }
 
-        private void drawLevelCard(
-                Canvas canvas,
-                int level,
-                float x,
-                float y,
-                float w,
-                float h,
-                boolean unlocked
-        ) {
-
-            paint.setColor(
-                    unlocked
-                            ? Color.WHITE
-                            : Color.rgb(220, 220, 225)
-            );
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            x,
-                            y,
-                            x + w,
-                            y + h
-                    ),
-                    18,
-                    18,
-                    paint
-            );
-
-            paint.setStyle(
-                    Paint.Style.STROKE
-            );
-
-            paint.setStrokeWidth(3);
-
-            paint.setColor(
-                    unlocked
-                            ? Color.rgb(150, 110, 220)
-                            : Color.GRAY
-            );
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            x,
-                            y,
-                            x + w,
-                            y + h
-                    ),
-                    18,
-                    18,
-                    paint
-            );
-
-            paint.setStyle(
-                    Paint.Style.FILL
-            );
-
-            drawText(
-                    canvas,
-                    String.valueOf(level),
-                    x + w / 2,
-                    y + 34,
-                    25,
-                    unlocked
-                            ? Color.rgb(70, 70, 80)
-                            : Color.GRAY,
-                    true
-            );
-
-            if (unlocked) {
-
-                int stars =
-                        getStars(level);
-
-                drawText(
-                        canvas,
-                        getStarString(stars),
-                        x + w / 2,
-                        y + 66,
-                        19,
-                        Color.rgb(255, 190, 45),
-                        true
-                );
-
-            } else {
-
-                drawText(
-                        canvas,
-                        "LOCKED",
-                        x + w / 2,
-                        y + 65,
-                        12,
-                        Color.GRAY,
-                        true
-                );
-            }
-        }
-
-        private int getStars(int level) {
-
-            return prefs.getInt(
-                    "stars_" + level,
-                    0
-            );
-        }
-
-        // =========================================================
-        // GAMEPLAY
-        // =========================================================
-
-        private void drawGameplay(Canvas canvas) {
-
-            drawBackground(canvas);
-
-            drawGameHud(canvas);
-
-            drawBoard(canvas);
-
-            drawGameBottom(canvas);
-
-            if (paused) {
-                drawPauseOverlay(canvas);
-            }
-        }
-
-        private void drawGameHud(Canvas canvas) {
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            10,
-                            12,
-                            getWidth() - 10,
-                            90
-                    ),
-                    22,
-                    22,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    "TIME",
-                    50,
-                    40,
-                    12,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    timeLeft + "s",
-                    50,
-                    69,
-                    23,
-                    timeLeft <= 10
-                            ? Color.RED
-                            : Color.rgb(65, 65, 75),
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    "SCORE",
-                    getWidth() / 2f,
-                    40,
-                    12,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    String.valueOf(score),
-                    getWidth() / 2f,
-                    69,
-                    23,
-                    Color.rgb(70, 70, 80),
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    "PAUSE",
-                    getWidth() - 58,
-                    51,
-                    78,
-                    42,
-                    Color.rgb(245, 105, 115)
-            );
-        }
-
-        private void drawBoard(Canvas canvas) {
-
-            float boardTop = 105;
-
-            float boardBottom =
-                    getHeight() - 145;
-
-            paint.setColor(
-                    Color.rgb(238, 226, 247)
-            );
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            10,
-                            boardTop,
-                            getWidth() - 10,
-                            boardBottom
-                    ),
-                    25,
-                    25,
-                    paint
-            );
-
-            float boardW =
-                    getWidth() - 30;
-
-            float cellW =
-                    boardW / COLUMNS;
-
-            float cellH =
-                    (boardBottom -
-                            boardTop -
-                            20) / ROWS;
-
-            for (int r = 0;
-                 r < ROWS;
-                 r++) {
-
-                for (int c = 0;
-                     c < COLUMNS;
-                     c++) {
-
-                    Candy candy =
-                            board[r][c];
-
-                    if (candy == null) {
-                        continue;
-                    }
-
-                    float cx =
-                            15 +
-                            c * cellW +
-                            cellW / 2f;
-
-                    float cy =
-                            boardTop +
-                            10 +
-                            r * cellH +
-                            cellH / 2f;
-
-                    float size =
-                            Math.min(
-                                    cellW,
-                                    cellH
-                            ) * 0.34f;
-
-                    drawCandyTile(
-                            canvas,
-                            cx,
-                            cy,
-                            size,
-                            candy
-                    );
-                }
-            }
-        }
-
-        // =========================================================
-        // CANDY DRAWING
-        // =========================================================
-
-        private void drawCandyTile(
-                Canvas canvas,
-                float cx,
-                float cy,
-                float size,
-                Candy candy
-        ) {
-
-            drawRealCandy(
-                    canvas,
-                    cx,
-                    cy,
-                    size,
-                    candy.colorIndex,
-                    candy.shape
-            );
-
-            if (candy.selected) {
-
-                paint.setStyle(
-                        Paint.Style.STROKE
-                );
-
-                paint.setStrokeWidth(5);
-
-                paint.setColor(Color.WHITE);
-
-                canvas.drawCircle(
-                        cx,
-                        cy,
-                        size + 7,
-                        paint
-                );
-
-                paint.setStyle(
-                        Paint.Style.FILL
-                );
-            }
-        }
-
-        private void drawRealCandy(
-                Canvas canvas,
-                float cx,
-                float cy,
-                float size,
-                int colorIndex,
-                int shape
-        ) {
-
-            int color =
-                    candyColors[
-                            colorIndex %
-                            candyColors.length
-                    ];
-
-            paint.setColor(
-                    Color.argb(
-                            45,
-                            40,
-                            30,
-                            50
-                    )
-            );
-
-            canvas.drawCircle(
-                    cx + 2,
-                    cy + 4,
-                    size,
-                    paint
-            );
-
-            paint.setColor(color);
-
-            if (shape == 0) {
-
-                Path heart =
-                        new Path();
-
-                heart.moveTo(
-                        cx,
-                        cy + size
-                );
-
-                heart.cubicTo(
-                        cx - size * 1.45f,
-                        cy - size * .05f,
-                        cx - size * .75f,
-                        cy - size * 1.25f,
-                        cx,
-                        cy - size * .35f
-                );
-
-                heart.cubicTo(
-                        cx + size * .75f,
-                        cy - size * 1.25f,
-                        cx + size * 1.45f,
-                        cy - size * .05f,
-                        cx,
-                        cy + size
-                );
-
-                heart.close();
-
-                canvas.drawPath(
-                        heart,
-                        paint
-                );
-
-            } else if (shape == 1) {
-
-                canvas.drawCircle(
-                        cx,
-                        cy,
-                        size,
-                        paint
-                );
-
-                paint.setColor(Color.WHITE);
-
-                paint.setStyle(
-                        Paint.Style.STROKE
-                );
-
-                paint.setStrokeWidth(3);
-
-                canvas.drawCircle(
-                        cx,
-                        cy,
-                        size * .68f,
-                        paint
-                );
-
-                paint.setStyle(
-                        Paint.Style.FILL
-                );
-
-            } else if (shape == 2) {
-
-                Path left =
-                        new Path();
-
-                left.moveTo(
-                        cx - size,
-                        cy - size * .55f
-                );
-
-                left.lineTo(
-                        cx - size * 1.55f,
-                        cy - size
-                );
-
-                left.lineTo(
-                        cx - size * 1.55f,
-                        cy + size
-                );
-
-                left.lineTo(
-                        cx - size,
-                        cy + size * .55f
-                );
-
-                left.close();
-
-                canvas.drawPath(
-                        left,
-                        paint
-                );
-
-                Path right =
-                        new Path();
-
-                right.moveTo(
-                        cx + size,
-                        cy - size * .55f
-                );
-
-                right.lineTo(
-                        cx + size * 1.55f,
-                        cy - size
-                );
-
-                right.lineTo(
-                        cx + size * 1.55f,
-                        cy + size
-                );
-
-                right.lineTo(
-                        cx + size,
-                        cy + size * .55f
-                );
-
-                right.close();
-
-                canvas.drawPath(
-                        right,
-                        paint
-                );
-
-                canvas.drawRoundRect(
-                        new RectF(
-                                cx - size,
-                                cy - size * .7f,
-                                cx + size,
-                                cy + size * .7f
-                        ),
-                        size * .25f,
-                        size * .25f,
-                        paint
-                );
-
-                paint.setColor(Color.WHITE);
-
-                paint.setStrokeWidth(4);
-
-                canvas.drawLine(
-                        cx - size * .55f,
-                        cy - size * .45f,
-                        cx + size * .55f,
-                        cy + size * .45f,
-                        paint
-                );
-
-            } else if (shape == 3) {
-
-                Path star =
-                        new Path();
-
-                for (int i = 0; i < 10; i++) {
-
-                    double angle =
-                            -Math.PI / 2
-                            + i * Math.PI / 5;
-
-                    float radius =
-                            i % 2 == 0
-                                    ? size
-                                    : size * .45f;
-
-                    float px =
-                            cx +
-                            (float) Math.cos(angle)
-                                    * radius;
-
-                    float py =
-                            cy +
-                            (float) Math.sin(angle)
-                                    * radius;
-
-                    if (i == 0) {
-                        star.moveTo(px, py);
-                    } else {
-                        star.lineTo(px, py);
-                    }
-                }
-
-                star.close();
-
-                canvas.drawPath(
-                        star,
-                        paint
-                );
-
-            } else if (shape == 4) {
-
-                Path gem =
-                        new Path();
-
-                gem.moveTo(
-                        cx,
-                        cy - size
-                );
-
-                gem.lineTo(
-                        cx + size,
-                        cy - size * .25f
-                );
-
-                gem.lineTo(
-                        cx + size * .65f,
-                        cy + size
-                );
-
-                gem.lineTo(
-                        cx - size * .65f,
-                        cy + size
-                );
-
-                gem.lineTo(
-                        cx - size,
-                        cy - size * .25f
-                );
-
-                gem.close();
-
-                canvas.drawPath(
-                        gem,
-                        paint
-                );
-
-            } else {
-
-                canvas.drawCircle(
-                        cx,
-                        cy,
-                        size,
-                        paint
-                );
-            }
-
-            paint.setColor(
-                    Color.argb(
-                            150,
-                            255,
-                            255,
-                            255
-                    )
-            );
-
-            canvas.drawCircle(
-                    cx - size * .30f,
-                    cy - size * .30f,
-                    size * .12f,
-                    paint
-            );
-        }
-
-        private void drawGameBottom(Canvas canvas) {
-
-            float y =
-                    getHeight() - 120;
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            12,
-                            y,
-                            getWidth() - 12,
-                            getHeight() - 10
-                    ),
-                    22,
-                    22,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    "TARGET",
-                    85,
-                    y + 28,
-                    11,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    collected +
-                            "/" +
-                            target,
-                    85,
-                    y + 66,
-                    22,
-                    Color.rgb(245, 75, 100),
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    "COMBO",
-                    getWidth() - 90,
-                    y + 28,
-                    11,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    combo + "x",
-                    getWidth() - 90,
-                    y + 66,
-                    25,
-                    Color.rgb(180, 100, 220),
-                    true
-            );
-        }
-
-        // =========================================================
-        // BOARD CREATION
-        // =========================================================
-
-        private void createBoard() {
-
-            for (int r = 0;
-                 r < ROWS;
-                 r++) {
-
-                for (int c = 0;
-                     c < COLUMNS;
-                     c++) {
-
-                    board[r][c] =
-                            createSafeCandy(
-                                    r,
-                                    c
-                            );
-                }
-            }
-        }
-
-        private Candy createSafeCandy(
-                int row,
-                int col
-        ) {
-
-            for (int attempt = 0;
-                 attempt < 50;
-                 attempt++) {
-
-                int color =
-                        random.nextInt(
-                                candyColors.length
-                        );
-
-                if (col >= 2 &&
-                        board[row][col - 1] != null &&
-                        board[row][col - 2] != null &&
-                        board[row][col - 1].colorIndex == color &&
-                        board[row][col - 2].colorIndex == color) {
-                    continue;
-                }
-
-                if (row >= 2 &&
-                        board[row - 1][col] != null &&
-                        board[row - 2][col] != null &&
-                        board[row - 1][col].colorIndex == color &&
-                        board[row - 2][col].colorIndex == color) {
-                    continue;
-                }
-
-                return new Candy(
-                        row,
-                        col,
-                        color,
-                        random.nextInt(6)
-                );
-            }
-
-            return new Candy(
-                    row,
-                    col,
-                    random.nextInt(
-                            candyColors.length
-                    ),
-                    random.nextInt(6)
-            );
-        }
-
-        // =========================================================
-        // SWIPE MATCH SYSTEM
-        // =========================================================
-
-        private void handleSwipe(
-                float startX,
-                float startY,
-                float endX,
-                float endY
-        ) {
-
-            if (moving || paused) {
-                return;
-            }
-
-            float dx =
-                    endX - startX;
-
-            float dy =
-                    endY - startY;
-
-            float distance =
-                    (float) Math.sqrt(
-                            dx * dx +
-                            dy * dy
-                    );
-
-            if (distance < 35) {
-                return;
-            }
-
-            Cell start =
-                    getCell(
-                            startX,
-                            startY
-                    );
-
-            if (start == null) {
-                return;
-            }
-
-            int targetRow =
-                    start.row;
-
-            int targetCol =
-                    start.col;
-
-            if (Math.abs(dx) >
-                    Math.abs(dy)) {
-
-                if (dx > 0) {
-                    targetCol++;
-                } else {
-                    targetCol--;
-                }
-
-            } else {
-
-                if (dy > 0) {
-                    targetRow++;
-                } else {
-                    targetRow--;
-                }
-            }
-
-            if (targetRow < 0 ||
-                    targetRow >= ROWS ||
-                    targetCol < 0 ||
-                    targetCol >= COLUMNS) {
-                return;
-            }
-
-            swapCandies(
-                    start.row,
-                    start.col,
-                    targetRow,
-                    targetCol
-            );
-
-            playSwapSound();
-
-            Set<String> matches =
-                    findMatches();
-
-            if (matches.isEmpty()) {
-
-                swapCandies(
-                        start.row,
-                        start.col,
-                        targetRow,
-                        targetCol
-                );
-
-                combo = 0;
-
-                invalidate();
-
-                return;
-            }
-
-            moving = true;
-
-            resolveMatches();
-        }
-
-        private Cell getCell(
-                float x,
-                float y
-        ) {
-
-            float boardTop = 105;
-
-            float boardBottom =
-                    getHeight() - 145;
-
-            if (y < boardTop ||
-                    y > boardBottom) {
-                return null;
-            }
-
-            float boardW =
-                    getWidth() - 30;
-
-            float cellW =
-                    boardW / COLUMNS;
-
-            float cellH =
-                    (boardBottom -
-                            boardTop -
-                            20) / ROWS;
-
-            int col =
-                    (int) ((x - 15) / cellW);
-
-            int row =
-                    (int) (
-                            (y -
-                                    boardTop -
-                                    10)
-                                    / cellH
-                    );
-
-            if (row < 0 ||
-                    row >= ROWS ||
-                    col < 0 ||
-                    col >= COLUMNS) {
-
-                return null;
-            }
-
-            return new Cell(
-                    row,
-                    col
-            );
-        }
-
-        private void swapCandies(
-                int r1,
-                int c1,
-                int r2,
-                int c2
-        ) {
-
-            Candy temp =
-                    board[r1][c1];
-
-            board[r1][c1] =
-                    board[r2][c2];
-
-            board[r2][c2] =
-                    temp;
-
-            if (board[r1][c1] != null) {
-                board[r1][c1].row = r1;
-                board[r1][c1].col = c1;
-            }
-
-            if (board[r2][c2] != null) {
-                board[r2][c2].row = r2;
-                board[r2][c2].col = c2;
-            }
-        }
-
-        private Set<String> findMatches() {
-
-            Set<String> matches =
-                    new HashSet<>();
-
-            for (int r = 0;
-                 r < ROWS;
-                 r++) {
-
-                int start = 0;
-
-                while (start < COLUMNS) {
-
-                    Candy first =
-                            board[r][start];
-
-                    if (first == null) {
-                        start++;
-                        continue;
-                    }
-
-                    int end =
-                            start + 1;
-
-                    while (end < COLUMNS &&
-                            board[r][end] != null &&
-                            board[r][end].colorIndex ==
-                                    first.colorIndex) {
-
-                        end++;
-                    }
-
-                    if (end - start >= 3) {
-
-                        for (int c = start;
-                             c < end;
-                             c++) {
-
-                            matches.add(
-                                    key(r, c)
-                            );
-                        }
-                    }
-
-                    start = end;
-                }
-            }
-
-            for (int c = 0;
-                 c < COLUMNS;
-                 c++) {
-
-                int start = 0;
-
-                while (start < ROWS) {
-
-                    Candy first =
-                            board[start][c];
-
-                    if (first == null) {
-                        start++;
-                        continue;
-                    }
-
-                    int end =
-                            start + 1;
-
-                    while (end < ROWS &&
-                            board[end][c] != null &&
-                            board[end][c].colorIndex ==
-                                    first.colorIndex) {
-
-                        end++;
-                    }
-
-                    if (end - start >= 3) {
-
-                        for (int r = start;
-                             r < end;
-                             r++) {
-
-                            matches.add(
-                                    key(r, c)
-                            );
-                        }
-                    }
-
-                    start = end;
-                }
-            }
-
-            return matches;
-        }
-
-        private void resolveMatches() {
-
-            Set<String> matches =
-                    findMatches();
-
-            if (matches.isEmpty()) {
-
-                moving = false;
-
-                checkWinCondition();
-
-                invalidate();
-
-                return;
-            }
-
-            combo++;
-
-            playMatchSound();
-            vibrateCandy();
-
-            if (combo >= 2) {
-                playComboSound();
-                vibrateCombo();
-            }
-
-            int gained =
-                    matches.size()
-                            * 20
-                            * Math.max(
-                                    1,
-                                    combo
-                            );
-
-            score += gained;
-
-            for (String position :
-                    matches) {
-
-                String[] parts =
-                        position.split(",");
-
-                int r =
-                        Integer.parseInt(
-                                parts[0]
-                        );
-
-                int c =
-                        Integer.parseInt(
-                                parts[1]
-                        );
-
-                if (board[r][c] != null) {
-
-                    if (board[r][c].colorIndex == 0) {
-                        collected++;
-                    }
-
-                    board[r][c] = null;
-                }
-            }
-
-            invalidate();
-
-            handler.postDelayed(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-
-                            collapseBoard();
-
-                            refillBoard();
-
-                            invalidate();
-
-                            handler.postDelayed(
-                                    new Runnable() {
-                                        @Override
-                                        public void run() {
-
-                                            Set<String>
-                                                    next =
-                                                    findMatches();
-
-                                            if (!next.isEmpty()) {
-
-                                                resolveMatches();
-
-                                            } else {
-
-                                                moving = false;
-
-                                                checkWinCondition();
-
-                                                invalidate();
-                                            }
-                                        }
-                                    },
-                                    120
-                            );
-                        }
-                    },
-                    100
-            );
-        }
-
-        private void collapseBoard() {
-
-            for (int c = 0;
-                 c < COLUMNS;
-                 c++) {
-
-                int writeRow =
-                        ROWS - 1;
-
-                for (int r = ROWS - 1;
-                     r >= 0;
-                     r--) {
-
-                    if (board[r][c] != null) {
-
-                        Candy candy =
-                                board[r][c];
-
-                        board[r][c] = null;
-
-                        board[writeRow][c] =
-                                candy;
-
-                        candy.row =
-                                writeRow;
-
-                        candy.col =
-                                c;
-
-                        writeRow--;
-                    }
-                }
-
-                while (writeRow >= 0) {
-
-                    board[writeRow][c] =
-                            null;
-
-                    writeRow--;
-                }
-            }
-        }
-
-        private void refillBoard() {
-
-            for (int r = 0;
-                 r < ROWS;
-                 r++) {
-
-                for (int c = 0;
-                     c < COLUMNS;
-                     c++) {
-
-                    if (board[r][c] == null) {
-
-                        board[r][c] =
-                                new Candy(
-                                        r,
-                                        c,
-                                        random.nextInt(
-                                                candyColors.length
-                                        ),
-                                        random.nextInt(6)
-                                );
-                    }
-                }
-            }
-        }
-
-        private String key(
-                int row,
-                int col
-        ) {
-
-            return row + "," + col;
-        }
-
-        // =========================================================
-        // WIN / GAME OVER
-        // =========================================================
-
-        private void checkWinCondition() {
-
-            if (score > highScore) {
-
-                highScore = score;
-
-                prefs.edit()
-                        .putInt(
-                                "highScore",
-                                highScore
-                        )
-                        .apply();
-            }
-
-            if (collected >= target) {
-
-                finishGame(true);
-            }
-        }
-
-        private void startGame(
-                int level
-        ) {
-
-            currentLevel =
-                    Math.max(
-                            1,
-                            Math.min(
-                                    level,
-                                    MAX_LEVEL
-                            )
-                    );
-
+        void startGame(int chosenLevel) {
+            level = Math.max(1, Math.min(30, chosenLevel));
             score = 0;
-
-            combo = 0;
-
             collected = 0;
-
-            target =
-                    18 +
-                    currentLevel * 3;
-
-            timeLeft =
-                    Math.max(
-                            35,
-                            65 -
-                            currentLevel
-                    );
-
+            combo = 0;
+            target = 18 + level * 3;
+            timeLeft = Math.max(35, 65 - level);
             paused = false;
-
-            moving = false;
 
             createBoard();
 
-            screen =
-                    SCREEN_GAMEPLAY;
-
-            startTimer();
+            screen = GAME;
+            handler.removeCallbacks(timer);
+            handler.postDelayed(timer, 1000);
 
             invalidate();
         }
 
-        private void finishGame(
-                boolean won
-        ) {
-
-            stopTimer();
-
-            moving = false;
-
-            if (score > highScore) {
-
-                highScore = score;
-
-                prefs.edit()
-                        .putInt(
-                                "highScore",
-                                highScore
-                        )
-                        .apply();
-            }
-
-            if (won) {
-
-                playWinSound();
-                vibrateCombo();
-
-                int stars =
-                        calculateStars();
-
-                prefs.edit()
-                        .putInt(
-                                "stars_" +
-                                currentLevel,
-                                Math.max(
-                                        stars,
-                                        getStars(
-                                                currentLevel
-                                        )
-                                )
-                        )
-                        .apply();
-
-                if (currentLevel < MAX_LEVEL) {
-
-                    int unlocked =
-                            currentLevel + 1;
-
-                    int saved =
-                            prefs.getInt(
-                                    "currentLevel",
-                                    1
-                            );
-
-                    if (unlocked > saved) {
-
-                        prefs.edit()
-                                .putInt(
-                                        "currentLevel",
-                                        unlocked
-                                )
-                                .apply();
-                    }
+        void createBoard() {
+            for (int r = 0; r < ROWS; r++) {
+                for (int col = 0; col < COLS; col++) {
+                    board[r][col] = createSafeCandy(r, col);
                 }
-
-                screen =
-                        SCREEN_COMPLETE;
-
-            } else {
-
-                playGameOverSound();
-
-                screen =
-                        SCREEN_GAMEOVER;
             }
 
-            invalidate();
+            if (!hasPossibleMoves()) {
+                shuffleBoard();
+            }
         }
 
-        private int calculateStars() {
+        int createSafeCandy(int r, int col) {
+            int value;
 
-            if (score >= target * 40) {
-                return 3;
+            do {
+                value = random.nextInt(candyColors.length);
+            } while (
+                    (col >= 2 &&
+                            board[r][col - 1] == value &&
+                            board[r][col - 2] == value)
+                    ||
+                    (r >= 2 &&
+                            board[r - 1][col] == value &&
+                            board[r - 2][col] == value)
+            );
+
+            return value;
+        }
+
+        void drawGame(Canvas c) {
+            drawHeader(c, "LEVEL " + level);
+
+            text(c, "TIME: " + timeLeft,
+                    20, 125, 18, Color.DKGRAY, Paint.Align.LEFT);
+
+            text(c, "SCORE: " + score,
+                    getWidth() / 2f, 125,
+                    18, Color.DKGRAY, Paint.Align.CENTER);
+
+            text(c, "Ⅱ",
+                    getWidth() - 35, 125,
+                    24, Color.DKGRAY, Paint.Align.CENTER);
+
+            text(c, "TARGET " + collected + "/" + target,
+                    getWidth() / 2f, 155,
+                    17, Color.rgb(245, 80, 110),
+                    Paint.Align.CENTER);
+
+            float boardSize = Math.min(
+                    getWidth() - 24,
+                    getHeight() - 260
+            );
+
+            float cell = boardSize / COLS;
+            float left = (getWidth() - boardSize) / 2f;
+            float top = 175;
+
+            roundRect(c, left - 5, top - 5,
+                    left + boardSize + 5,
+                    top + boardSize + 5,
+                    20,
+                    Color.rgb(255, 225, 240));
+
+            for (int r = 0; r < ROWS; r++) {
+                for (int col = 0; col < COLS; col++) {
+
+                    float cx = left + col * cell + cell / 2f;
+                    float cy = top + r * cell + cell / 2f;
+
+                    drawCandy(c, cx, cy,
+                            cell * 0.38f,
+                            board[r][col]);
+                }
             }
 
-            if (score >= target * 27) {
-                return 2;
+            text(c, "SWIPE • MATCH 3 OR MORE",
+                    getWidth() / 2f,
+                    getHeight() - 65,
+                    15, Color.GRAY,
+                    Paint.Align.CENTER);
+
+            text(c, "COMBO x" + Math.max(1, combo),
+                    getWidth() / 2f,
+                    getHeight() - 35,
+                    18,
+                    Color.rgb(245, 110, 40),
+                    Paint.Align.CENTER);
+
+            if (paused) {
+                drawPause(c);
+            }
+        }
+
+        void drawCandy(Canvas c, float x, float y, float radius, int type) {
+            int color = candyColors[type];
+
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(color);
+
+            switch (type) {
+                case 0:
+                    c.drawCircle(x, y, radius, p);
+                    c.drawCircle(x - radius * .45f,
+                            y - radius * .65f,
+                            radius * .45f, p);
+                    c.drawCircle(x + radius * .45f,
+                            y - radius * .65f,
+                            radius * .45f, p);
+                    break;
+
+                case 1:
+                    c.drawCircle(x, y, radius, p);
+                    break;
+
+                case 2:
+                    Path star = new Path();
+                    for (int i = 0; i < 10; i++) {
+                        double a = -Math.PI / 2 + i * Math.PI / 5;
+                        float rr = (i % 2 == 0)
+                                ? radius
+                                : radius * .45f;
+                        float px = x + (float) Math.cos(a) * rr;
+                        float py = y + (float) Math.sin(a) * rr;
+
+                        if (i == 0) star.moveTo(px, py);
+                        else star.lineTo(px, py);
+                    }
+                    star.close();
+                    c.drawPath(star, p);
+                    break;
+
+                case 3:
+                    c.drawRoundRect(
+                            x - radius, y - radius,
+                            x + radius, y + radius,
+                            radius * .3f, radius * .3f, p);
+                    break;
+
+                case 4:
+                    Path diamond = new Path();
+                    diamond.moveTo(x, y - radius);
+                    diamond.lineTo(x + radius, y);
+                    diamond.lineTo(x, y + radius);
+                    diamond.lineTo(x - radius, y);
+                    diamond.close();
+                    c.drawPath(diamond, p);
+                    break;
+
+                default:
+                    c.drawCircle(x, y, radius, p);
+                    c.drawCircle(x, y,
+                            radius * .55f,
+                            lighten(color),
+                            p);
+                    break;
             }
 
+            p.setColor(Color.WHITE);
+            c.drawCircle(x - radius * .3f,
+                    y - radius * .35f,
+                    radius * .13f, p);
+        }
+
+        int lighten(int color) {
+            int r = Math.min(255, Color.red(color) + 40);
+            int g = Math.min(255, Color.green(color) + 40);
+            int b = Math.min(255, Color.blue(color) + 40);
+            return Color.rgb(r, g, b);
+        }
+
+        void drawPause(Canvas c) {
+            p.setColor(Color.argb(190, 0, 0, 0));
+            c.drawRect(0, 0, getWidth(), getHeight(), p);
+
+            text(c, "PAUSED", getWidth() / 2f,
+                    230, 35, Color.WHITE,
+                    Paint.Align.CENTER);
+
+            button(c, "RESUME", 70, 275,
+                    getWidth() - 70, 335,
+                    Color.rgb(70, 200, 105));
+
+            button(c, "RESTART", 70, 350,
+                    getWidth() - 70, 410,
+                    Color.rgb(80, 160, 245));
+
+            button(c, "MAIN MENU", 70, 425,
+                    getWidth() - 70, 485,
+                    Color.rgb(245, 90, 120));
+        }
+
+        void drawComplete(Canvas c) {
+            text(c, "🎉", getWidth() / 2f,
+                    125, 55, Color.WHITE,
+                    Paint.Align.CENTER);
+
+            text(c, "LEVEL " + level + " COMPLETE!",
+                    getWidth() / 2f, 190,
+                    28, Color.rgb(245, 75, 110),
+                    Paint.Align.CENTER);
+
+            int stars = calculateStars();
+
+            text(c,
+                    stars >= 1 ? "★" : "☆",
+                    getWidth() / 2f - 60,
+                    255, 45,
+                    Color.rgb(255, 190, 40),
+                    Paint.Align.CENTER);
+
+            text(c,
+                    stars >= 2 ? "★" : "☆",
+                    getWidth() / 2f,
+                    255, 45,
+                    Color.rgb(255, 190, 40),
+                    Paint.Align.CENTER);
+
+            text(c,
+                    stars >= 3 ? "★" : "☆",
+                    getWidth() / 2f + 60,
+                    255, 45,
+                    Color.rgb(255, 190, 40),
+                    Paint.Align.CENTER);
+
+            text(c, "Score: " + score,
+                    getWidth() / 2f, 305,
+                    21, Color.DKGRAY,
+                    Paint.Align.CENTER);
+
+            button(c, "NEXT LEVEL", 60, 355,
+                    getWidth() - 60, 415,
+                    Color.rgb(70, 200, 105));
+
+            button(c, "REPLAY", 60, 430,
+                    getWidth() - 60, 490,
+                    Color.rgb(80, 160, 245));
+
+            button(c, "HOME", 60, 505,
+                    getWidth() - 60, 565,
+                    Color.rgb(245, 90, 120));
+        }
+
+        int calculateStars() {
+            if (score >= target * 70) return 3;
+            if (score >= target * 40) return 2;
             return 1;
         }
 
-        private String getStarString(
-                int stars
-        ) {
+        void completeLevel() {
+            handler.removeCallbacks(timer);
 
-            String result = "";
-
-            for (int i = 0; i < 3; i++) {
-
-                result +=
-                        i < stars
-                                ? "★"
-                                : "☆";
+            if (score > bestScore) {
+                bestScore = score;
+                prefs.edit().putInt("bestScore", bestScore).apply();
             }
 
-            return result;
+            if (level < 30 && level >= prefs.getInt("level", 1)) {
+                prefs.edit().putInt("level", level + 1).apply();
+            }
+
+            screen = COMPLETE;
+            invalidate();
         }
 
-        // =========================================================
-        // TOUCH
-        // =========================================================
+        void drawGameOver(Canvas c) {
+            text(c, "GAME OVER",
+                    getWidth() / 2f, 180,
+                    36, Color.rgb(245, 70, 100),
+                    Paint.Align.CENTER);
+
+            text(c, "Score: " + score,
+                    getWidth() / 2f, 245,
+                    22, Color.DKGRAY,
+                    Paint.Align.CENTER);
+
+            text(c, "Best: " + bestScore,
+                    getWidth() / 2f, 285,
+                    19, Color.GRAY,
+                    Paint.Align.CENTER);
+
+            button(c, "PLAY AGAIN", 60, 350,
+                    getWidth() - 60, 415,
+                    Color.rgb(70, 200, 105));
+
+            button(c, "MAIN MENU", 60, 430,
+                    getWidth() - 60, 495,
+                    Color.rgb(245, 90, 120));
+        }
+
+        void drawSettings(Canvas c) {
+            drawHeader(c, "SETTINGS");
+
+            setting(c, "Music", musicOn, 130);
+            setting(c, "Sound Effects", soundOn, 205);
+            setting(c, "Vibration", vibrationOn, 280);
+
+            button(c, "BACK", 70, 380,
+                    getWidth() - 70, 440,
+                    Color.rgb(80, 160, 245));
+
+            text(c, "CandyJolt",
+                    getWidth() / 2f, 520,
+                    25, Color.rgb(245, 80, 110),
+                    Paint.Align.CENTER);
+
+            text(c, "Keep Playing • Keep Smiling!",
+                    getWidth() / 2f, 550,
+                    15, Color.GRAY,
+                    Paint.Align.CENTER);
+        }
+
+        void setting(Canvas c, String name, boolean value, int y) {
+            text(c, name, 40, y,
+                    20, Color.DKGRAY,
+                    Paint.Align.LEFT);
+
+            button(c, value ? "ON" : "OFF",
+                    getWidth() - 120, y - 30,
+                    getWidth() - 35, y + 10,
+                    value
+                            ? Color.rgb(70, 200, 105)
+                            : Color.rgb(170, 170, 175));
+        }
+
+        void drawScores(Canvas c) {
+            drawHeader(c, "HIGH SCORES");
+
+            text(c, "🏆",
+                    getWidth() / 2f, 145,
+                    50, Color.WHITE,
+                    Paint.Align.CENTER);
+
+            text(c, "BEST SCORE",
+                    getWidth() / 2f, 205,
+                    20, Color.GRAY,
+                    Paint.Align.CENTER);
+
+            text(c, "" + bestScore,
+                    getWidth() / 2f, 255,
+                    38, Color.rgb(245, 90, 110),
+                    Paint.Align.CENTER);
+
+            text(c, "1. You", 45, 330,
+                    21, Color.DKGRAY,
+                    Paint.Align.LEFT);
+
+            text(c, "" + bestScore,
+                    getWidth() - 45, 330,
+                    21, Color.DKGRAY,
+                    Paint.Align.RIGHT);
+
+            text(c, "2. Candy Master", 45, 385,
+                    19, Color.GRAY,
+                    Paint.Align.LEFT);
+
+            text(c, "850", getWidth() - 45, 385,
+                    19, Color.GRAY,
+                    Paint.Align.RIGHT);
+
+            text(c, "3. Sweet Player", 45, 440,
+                    19, Color.GRAY,
+                    Paint.Align.LEFT);
+
+            text(c, "720", getWidth() - 45, 440,
+                    19, Color.GRAY,
+                    Paint.Align.RIGHT);
+
+            button(c, "BACK", 70, 500,
+                    getWidth() - 70, 560,
+                    Color.rgb(80, 160, 245));
+        }
 
         @Override
-        public boolean onTouchEvent(
-                MotionEvent event
-        ) {
+        public boolean onTouchEvent(MotionEvent event) {
 
-            float x =
-                    event.getX();
+            float x = event.getX();
+            float y = event.getY();
 
-            float y =
-                    event.getY();
-
-            if (event.getAction() ==
-                    MotionEvent.ACTION_DOWN) {
-
-                touchDownX = x;
-                touchDownY = y;
-
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                downX = x;
+                downY = y;
+                moving = false;
                 return true;
             }
 
-            if (event.getAction() ==
-                    MotionEvent.ACTION_UP) {
+            if (event.getAction() == MotionEvent.ACTION_UP) {
 
-                switch (screen) {
+                float dx = x - downX;
+                float dy = y - downY;
 
-                    case SCREEN_HOME:
-                        handleHomeTouch(
-                                x,
-                                y
-                        );
-                        break;
-
-                    case SCREEN_LEVELS:
-                        handleLevelsTouch(
-                                x,
-                                y
-                        );
-                        break;
-
-                    case SCREEN_GAMEPLAY:
-
-                        if (paused) {
-
-                            handlePauseTouch(
-                                    x,
-                                    y
-                            );
-
-                        } else if (
-                                touchDownY < 100 &&
-                                touchDownX >
-                                        getWidth() - 115) {
-
-                            paused = true;
-
-                            stopTimer();
-
-                            invalidate();
-
-                        } else {
-
-                            handleSwipe(
-                                    touchDownX,
-                                    touchDownY,
-                                    x,
-                                    y
-                            );
-                        }
-
-                        break;
-
-                    case SCREEN_COMPLETE:
-                        handleCompleteTouch(
-                                x,
-                                y
-                        );
-                        break;
-
-                    case SCREEN_GAMEOVER:
-                        handleGameOverTouch(
-                                x,
-                                y
-                        );
-                        break;
-
-                    case SCREEN_SETTINGS:
-                        handleSettingsTouch(
-                                x,
-                                y
-                        );
-                        break;
-
-                    case SCREEN_SCORES:
-                        handleScoresTouch(
-                                x,
-                                y
-                        );
-                        break;
+                if (screen == GAME && !paused &&
+                        Math.max(Math.abs(dx), Math.abs(dy)) > 35) {
+                    handleSwipe(dx, dy);
+                    return true;
                 }
 
+                handleTap(x, y);
                 return true;
             }
 
             return true;
         }
 
-        // =========================================================
-        // HOME TOUCH
-        // =========================================================
+        void handleTap(float x, float y) {
 
-        private void handleHomeTouch(
-                float x,
-                float y
-        ) {
+            if (screen == HOME) {
 
-            float center =
-                    getWidth() / 2f;
+                if (y >= 245 && y <= 315) {
+                    startGame(level);
+                } else if (y >= 330 && y <= 390) {
+                    screen = LEVELS;
+                    invalidate();
+                } else if (y >= 405 && y <= 465) {
+                    screen = SCORES;
+                    invalidate();
+                } else if (y >= 480 && y <= 540) {
+                    screen = SETTINGS;
+                    invalidate();
+                } else if (y > 550) {
+                    musicOn = !musicOn;
+                    prefs.edit().putBoolean("music", musicOn).apply();
+                    invalidate();
+                }
 
-            if (inside(
-                    x,
-                    y,
-                    center,
-                    390,
-                    250,
-                    65
-            )) {
+            } else if (screen == LEVELS) {
 
-                startGame(currentLevel);
-                return;
-            }
+                if (y < 90) {
+                    screen = HOME;
+                    invalidate();
+                    return;
+                }
 
-            if (inside(
-                    x,
-                    y,
-                    center,
-                    475,
-                    250,
-                    65
-            )) {
+                int size = 75;
+                int gap = 12;
+                int startY = 155;
 
-                screen =
-                        SCREEN_LEVELS;
+                for (int i = 1; i <= 30; i++) {
 
-                invalidate();
+                    int col = (i - 1) % 3;
+                    int row = (i - 1) / 3;
 
-                return;
-            }
+                    float l = 25 + col * (size + gap);
+                    float t = startY + row * (size + gap);
+                    float r = l + size;
+                    float b = t + size;
 
-            if (inside(
-                    x,
-                    y,
-                    center,
-                    560,
-                    250,
-                    65
-            )) {
+                    if (x >= l && x <= r &&
+                            y >= t && y <= b &&
+                            i <= level) {
+                        startGame(i);
+                        return;
+                    }
+                }
 
-                screen =
-                        SCREEN_SCORES;
+            } else if (screen == GAME) {
 
-                invalidate();
+                if (paused) {
 
-                return;
-            }
+                    if (y >= 275 && y <= 335) {
+                        paused = false;
+                        invalidate();
+                    } else if (y >= 350 && y <= 410) {
+                        startGame(level);
+                    } else if (y >= 425 && y <= 485) {
+                        paused = false;
+                        screen = HOME;
+                        handler.removeCallbacks(timer);
+                        invalidate();
+                    }
 
-            if (inside(
-                    x,
-                    y,
-                    center,
-                    645,
-                    250,
-                    65
-            )) {
+                } else if (y < 150 && x > getWidth() - 80) {
+                    paused = true;
+                    invalidate();
+                }
 
-                screen =
-                        SCREEN_SETTINGS;
+            } else if (screen == COMPLETE) {
 
-                invalidate();
+                if (y >= 355 && y <= 415) {
+                    startGame(Math.min(30, level + 1));
+                } else if (y >= 430 && y <= 490) {
+                    startGame(level);
+                } else if (y >= 505 && y <= 565) {
+                    screen = HOME;
+                    invalidate();
+                }
 
-                return;
-            }
+            } else if (screen == GAMEOVER) {
 
-            if (x > getWidth() - 80 &&
-                    y < 90) {
+                if (y >= 350 && y <= 415) {
+                    startGame(level);
+                } else if (y >= 430 && y <= 495) {
+                    screen = HOME;
+                    invalidate();
+                }
 
-                musicOn =
-                        !musicOn;
+            } else if (screen == SETTINGS) {
+
+                if (y >= 100 && y <= 170) {
+                    musicOn = !musicOn;
+                } else if (y >= 175 && y <= 245) {
+                    soundOn = !soundOn;
+                } else if (y >= 250 && y <= 320) {
+                    vibrationOn = !vibrationOn;
+                } else if (y >= 360 && y <= 450) {
+                    screen = HOME;
+                }
 
                 prefs.edit()
-                        .putBoolean(
-                                "music",
-                                musicOn
-                        )
+                        .putBoolean("music", musicOn)
+                        .putBoolean("sound", soundOn)
+                        .putBoolean("vibration", vibrationOn)
                         .apply();
 
                 invalidate();
-            }
-        }
 
-        // =========================================================
-        // LEVEL TOUCH
-        // =========================================================
+            } else if (screen == SCORES) {
 
-        private void handleLevelsTouch(
-                float x,
-                float y
-        ) {
-
-            if (y < 90 &&
-                    x < 80) {
-
-                screen =
-                        SCREEN_HOME;
-
-                invalidate();
-
-                return;
-            }
-
-            if (y < 90 &&
-                    x > getWidth() - 80) {
-
-                screen =
-                        SCREEN_HOME;
-
-                invalidate();
-
-                return;
-            }
-
-            int cardW = 105;
-            int cardH = 82;
-            int gapX = 15;
-            int gapY = 15;
-
-            int startY = 120;
-
-            int totalW =
-                    cardW * 3 +
-                    gapX * 2;
-
-            int startX =
-                    (getWidth() - totalW) / 2;
-
-            for (int i = 1;
-                 i <= MAX_LEVEL;
-                 i++) {
-
-                int row =
-                        (i - 1) / 3;
-
-                int col =
-                        (i - 1) % 3;
-
-                float cx =
-                        startX +
-                        col *
-                        (cardW + gapX) +
-                        cardW / 2f;
-
-                float cy =
-                        startY +
-                        row *
-                        (cardH + gapY) +
-                        cardH / 2f;
-
-                if (inside(
-                        x,
-                        y,
-                        cx,
-                        cy,
-                        cardW,
-                        cardH
-                )) {
-
-                    boolean unlocked =
-                            i <= Math.min(
-                                    currentLevel + 2,
-                                    MAX_LEVEL
-                            );
-
-                    if (unlocked) {
-                        startGame(i);
-                    }
-
-                    return;
+                if (y >= 490 && y <= 580) {
+                    screen = HOME;
+                    invalidate();
                 }
             }
         }
 
-        // =========================================================
-        // PAUSE
-        // =========================================================
+        void handleSwipe(float dx, float dy) {
 
-        private void handlePauseTouch(
-                float x,
-                float y
-        ) {
+            float boardSize = Math.min(
+                    getWidth() - 24,
+                    getHeight() - 260
+            );
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    260,
-                    230,
-                    58
-            )) {
+            float cell = boardSize / COLS;
+            float left = (getWidth() - boardSize) / 2f;
+            float top = 175;
 
-                paused = false;
+            int col = (int) ((downX - left) / cell);
+            int row = (int) ((downY - top) / cell);
 
-                startTimer();
-
-                invalidate();
-
+            if (row < 0 || row >= ROWS ||
+                    col < 0 || col >= COLS) {
                 return;
             }
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    335,
-                    230,
-                    58
-            )) {
+            int newRow = row;
+            int newCol = col;
 
-                startGame(
-                        currentLevel
-                );
+            if (Math.abs(dx) > Math.abs(dy)) {
+                newCol += dx > 0 ? 1 : -1;
+            } else {
+                newRow += dy > 0 ? 1 : -1;
+            }
 
+            if (newRow < 0 || newRow >= ROWS ||
+                    newCol < 0 || newCol >= COLS) {
                 return;
             }
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    410,
-                    230,
-                    58
-            )) {
+            swap(row, col, newRow, newCol);
 
-                paused = false;
-
-                screen =
-                        SCREEN_SETTINGS;
-
-                invalidate();
-
-                return;
+            if (findMatches().isEmpty()) {
+                swap(row, col, newRow, newCol);
+            } else {
+                combo = 0;
+                resolveBoard();
             }
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    485,
-                    230,
-                    58
-            )) {
-
-                paused = false;
-
-                screen =
-                        SCREEN_HOME;
-
-                invalidate();
-            }
+            invalidate();
         }
 
-        // =========================================================
-        // COMPLETE
-        // =========================================================
-
-        private void handleCompleteTouch(
-                float x,
-                float y
-        ) {
-
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    470,
-                    250,
-                    60
-            )) {
-
-                int next =
-                        Math.min(
-                                currentLevel + 1,
-                                MAX_LEVEL
-                        );
-
-                startGame(next);
-
-                return;
-            }
-
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    545,
-                    250,
-                    60
-            )) {
-
-                startGame(
-                        currentLevel
-                );
-
-                return;
-            }
-
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    620,
-                    250,
-                    60
-            )) {
-
-                screen =
-                        SCREEN_HOME;
-
-                invalidate();
-            }
+        void swap(int r1, int c1, int r2, int c2) {
+            int temp = board[r1][c1];
+            board[r1][c1] = board[r2][c2];
+            board[r2][c2] = temp;
         }
 
-        // =========================================================
-        // GAME OVER
-        // =========================================================
+        Set<String> findMatches() {
 
-        private void handleGameOverTouch(
-                float x,
-                float y
-        ) {
+            Set<String> matches = new HashSet<>();
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    450,
-                    250,
-                    65
-            )) {
+            for (int r = 0; r < ROWS; r++) {
 
-                startGame(
-                        currentLevel
-                );
+                int start = 0;
 
-                return;
+                for (int c = 1; c <= COLS; c++) {
+
+                    boolean same = c < COLS &&
+                            board[r][c] == board[r][start];
+
+                    if (!same) {
+
+                        int length = c - start;
+
+                        if (length >= 3) {
+                            for (int x = start; x < c; x++) {
+                                matches.add(r + "," + x);
+                            }
+                        }
+
+                        start = c;
+                    }
+                }
             }
 
-            if (inside(
-                    x,
-                    y,
-                    getWidth() / 2f,
-                    535,
-                    250,
-                    65
-            )) {
+            for (int c = 0; c < COLS; c++) {
 
-                screen =
-                        SCREEN_HOME;
+                int start = 0;
 
-                invalidate();
+                for (int r = 1; r <= ROWS; r++) {
+
+                    boolean same = r < ROWS &&
+                            board[r][c] == board[start][c];
+
+                    if (!same) {
+
+                        int length = r - start;
+
+                        if (length >= 3) {
+                            for (int x = start; x < r; x++) {
+                                matches.add(x + "," + c);
+                            }
+                        }
+
+                        start = r;
+                    }
+                }
+            }
+
+            return matches;
+        }
+
+        void resolveBoard() {
+
+            Set<String> matches;
+
+            while (!(matches = findMatches()).isEmpty()) {
+
+                combo++;
+
+                int amount = matches.size();
+
+                score += amount * 20 * combo;
+
+                collected += amount;
+
+                if (vibrationOn) {
+                    try {
+                        Vibrator vibrator =
+                                (Vibrator) getContext()
+                                        .getSystemService(Context.VIBRATOR_SERVICE);
+
+                        if (vibrator != null) {
+                            vibrator.vibrate(35);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                for (String key : matches) {
+                    String[] parts = key.split(",");
+                    int r = Integer.parseInt(parts[0]);
+                    int c = Integer.parseInt(parts[1]);
+                    board[r][c] = -1;
+                }
+
+                dropCandies();
+
+                if (collected >= target) {
+                    completeLevel();
+                    return;
+                }
+            }
+
+            if (!hasPossibleMoves()) {
+                shuffleBoard();
             }
         }
 
-        // =========================================================
-        // SETTINGS
-        // =========================================================
+        void dropCandies() {
 
-        private void handleSettingsTouch(
-                float x,
-                float y
-        ) {
+            for (int c = 0; c < COLS; c++) {
 
-            if (y < 90 &&
-                    x < 80) {
+                int write = ROWS - 1;
 
-                screen =
-                        SCREEN_HOME;
+                for (int r = ROWS - 1; r >= 0; r--) {
 
-                invalidate();
+                    if (board[r][c] != -1) {
+                        board[write][c] = board[r][c];
+                        write--;
+                    }
+                }
 
-                return;
-            }
-
-            float base = 145;
-
-            if (y >= base &&
-                    y <= base + 55) {
-
-                musicOn =
-                        !musicOn;
-
-                prefs.edit()
-                        .putBoolean(
-                                "music",
-                                musicOn
-                        )
-                        .apply();
-
-                invalidate();
-
-                return;
-            }
-
-            if (y >= base + 70 &&
-                    y <= base + 125) {
-
-                soundOn =
-                        !soundOn;
-
-                prefs.edit()
-                        .putBoolean(
-                                "sound",
-                                soundOn
-                        )
-                        .apply();
-
-                invalidate();
-
-                return;
-            }
-
-            if (y >= base + 140 &&
-                    y <= base + 195) {
-
-                vibrationOn =
-                        !vibrationOn;
-
-                prefs.edit()
-                        .putBoolean(
-                                "vibration",
-                                vibrationOn
-                        )
-                        .apply();
-
-                invalidate();
+                while (write >= 0) {
+                    board[write][c] =
+                            random.nextInt(candyColors.length);
+                    write--;
+                }
             }
         }
 
-        // =========================================================
-        // SCORES
-        // =========================================================
+        boolean hasPossibleMoves() {
 
-        private void handleScoresTouch(
-                float x,
-                float y
-        ) {
+            for (int r = 0; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
 
-            if (y < 90 &&
-                    x < 80) {
+                    if (c + 1 < COLS) {
+                        swap(r, c, r, c + 1);
 
-                screen =
-                        SCREEN_HOME;
+                        boolean possible =
+                                !findMatches().isEmpty();
 
-                invalidate();
-            }
-        }
+                        swap(r, c, r, c + 1);
 
-        // =========================================================
-        // SETTINGS SCREEN
-        // =========================================================
+                        if (possible) return true;
+                    }
 
-        private void drawSettings(
-                Canvas canvas
-        ) {
+                    if (r + 1 < ROWS) {
+                        swap(r, c, r + 1, c);
 
-            drawBackground(canvas);
+                        boolean possible =
+                                !findMatches().isEmpty();
 
-            drawHeader(
-                    canvas,
-                    "Settings",
-                    true,
-                    false
-            );
+                        swap(r, c, r + 1, c);
 
-            float y = 145;
-
-            drawSettingRow(
-                    canvas,
-                    "Music",
-                    musicOn,
-                    y
-            );
-
-            drawSettingRow(
-                    canvas,
-                    "Sound Effects",
-                    soundOn,
-                    y + 70
-            );
-
-            drawSettingRow(
-                    canvas,
-                    "Vibration",
-                    vibrationOn,
-                    y + 140
-            );
-
-            drawSettingTextRow(
-                    canvas,
-                    "Language",
-                    "English",
-                    y + 235
-            );
-
-            drawSettingTextRow(
-                    canvas,
-                    "Difficulty",
-                    "Normal",
-                    y + 305
-            );
-
-            drawText(
-                    canvas,
-                    "ABOUT",
-                    35,
-                    y + 410,
-                    14,
-                    Color.GRAY,
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    "RATE APP",
-                    getWidth() / 2f,
-                    y + 465,
-                    250,
-                    52,
-                    Color.rgb(255, 165, 65)
-            );
-
-            drawButton(
-                    canvas,
-                    "PRIVACY POLICY",
-                    getWidth() / 2f,
-                    y + 530,
-                    250,
-                    52,
-                    Color.rgb(90, 145, 235)
-            );
-
-            drawButton(
-                    canvas,
-                    "MORE GAMES",
-                    getWidth() / 2f,
-                    y + 595,
-                    250,
-                    52,
-                    Color.rgb(180, 105, 220)
-            );
-        }
-
-        private void drawSettingRow(
-                Canvas canvas,
-                String name,
-                boolean enabled,
-                float y
-        ) {
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            25,
-                            y,
-                            getWidth() - 25,
-                            y + 55
-                    ),
-                    18,
-                    18,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    name,
-                    50,
-                    y + 35,
-                    17,
-                    Color.DKGRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    enabled
-                            ? "ON"
-                            : "OFF",
-                    getWidth() - 70,
-                    y + 35,
-                    15,
-                    enabled
-                            ? Color.rgb(
-                                    70,
-                                    180,
-                                    100
-                            )
-                            : Color.GRAY,
-                    true
-            );
-        }
-
-        private void drawSettingTextRow(
-                Canvas canvas,
-                String name,
-                String value,
-                float y
-        ) {
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            25,
-                            y,
-                            getWidth() - 25,
-                            y + 55
-                    ),
-                    18,
-                    18,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    name,
-                    50,
-                    y + 35,
-                    17,
-                    Color.DKGRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    value,
-                    getWidth() - 75,
-                    y + 35,
-                    15,
-                    Color.rgb(
-                            100,
-                            100,
-                            110
-                    ),
-                    true
-            );
-        }
-
-        // =========================================================
-        // HIGH SCORES
-        // =========================================================
-
-        private void drawHighScores(
-                Canvas canvas
-        ) {
-
-            drawBackground(canvas);
-
-            drawHeader(
-                    canvas,
-                    "High Scores",
-                    true,
-                    false
-            );
-
-            drawText(
-                    canvas,
-                    "♛",
-                    getWidth() - 40,
-                    48,
-                    28,
-                    Color.rgb(
-                            255,
-                            190,
-                            45
-                    ),
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    "GLOBAL",
-                    getWidth() / 2f - 80,
-                    115,
-                    135,
-                    48,
-                    Color.rgb(
-                            90,
-                            145,
-                            235
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "FRIENDS",
-                    getWidth() / 2f + 80,
-                    115,
-                    135,
-                    48,
-                    Color.rgb(
-                            190,
-                            190,
-                            200
-                    )
-            );
-
-            float y = 190;
-
-            for (int i = 0;
-                 i < 5;
-                 i++) {
-
-                paint.setColor(
-                        Color.WHITE
-                );
-
-                canvas.drawRoundRect(
-                        new RectF(
-                                25,
-                                y,
-                                getWidth() - 25,
-                                y + 68
-                        ),
-                        18,
-                        18,
-                        paint
-                );
-
-                drawText(
-                        canvas,
-                        "#" + (i + 1),
-                        55,
-                        y + 42,
-                        19,
-                        Color.rgb(
-                                80,
-                                80,
-                                90
-                        ),
-                        true
-                );
-
-                drawText(
-                        canvas,
-                        getFlag(i),
-                        100,
-                        y + 42,
-                        20,
-                        Color.DKGRAY,
-                        true
-                );
-
-                drawText(
-                        canvas,
-                        playerNames[i],
-                        155,
-                        y + 42,
-                        15,
-                        Color.DKGRAY,
-                        true
-                );
-
-                drawText(
-                        canvas,
-                        String.valueOf(
-                                sampleScores[i]
-                        ),
-                        getWidth() - 70,
-                        y + 42,
-                        17,
-                        Color.rgb(
-                                180,
-                                100,
-                                220
-                        ),
-                        true
-                );
-
-                y += 82;
-            }
-        }
-
-        private String getFlag(
-                int index
-        ) {
-
-            String[] flags = {
-                    "🇱🇸",
-                    "🇿🇦",
-                    "🇧🇼",
-                    "🇳🇦",
-                    "🇿🇼"
-            };
-
-            return flags[index];
-        }
-
-        // =========================================================
-        // COMPLETE SCREEN
-        // =========================================================
-
-        private void drawComplete(
-                Canvas canvas
-        ) {
-
-            drawBackground(canvas);
-
-            drawTitle(
-                    canvas,
-                    "LEVEL " +
-                            currentLevel +
-                            " COMPLETE!",
-                    getWidth() / 2f,
-                    110,
-                    28
-            );
-
-            int stars =
-                    getStars(
-                            currentLevel
-                    );
-
-            drawText(
-                    canvas,
-                    getStarString(stars),
-                    getWidth() / 2f,
-                    190,
-                    45,
-                    Color.rgb(
-                            255,
-                            190,
-                            45
-                    ),
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    "Amazing!",
-                    getWidth() / 2f,
-                    245,
-                    23,
-                    Color.DKGRAY,
-                    true
-            );
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            45,
-                            285,
-                            getWidth() - 45,
-                            400
-                    ),
-                    24,
-                    24,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    "FINAL SCORE",
-                    getWidth() / 2f,
-                    325,
-                    14,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    String.valueOf(score),
-                    getWidth() / 2f,
-                    370,
-                    32,
-                    Color.rgb(
-                            70,
-                            70,
-                            80
-                    ),
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    currentLevel < MAX_LEVEL
-                            ? "NEXT LEVEL"
-                            : "PLAY AGAIN",
-                    getWidth() / 2f,
-                    470,
-                    250,
-                    60,
-                    Color.rgb(
-                            85,
-                            190,
-                            110
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "REPLAY",
-                    getWidth() / 2f,
-                    545,
-                    250,
-                    60,
-                    Color.rgb(
-                            90,
-                            145,
-                            235
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "HOME",
-                    getWidth() / 2f,
-                    620,
-                    250,
-                    60,
-                    Color.rgb(
-                            180,
-                            105,
-                            220
-                    )
-            );
-        }
-
-        // =========================================================
-        // GAME OVER
-        // =========================================================
-
-        private void drawGameOver(
-                Canvas canvas
-        ) {
-
-            drawBackground(canvas);
-
-            drawTitle(
-                    canvas,
-                    "Game Over",
-                    getWidth() / 2f,
-                    115,
-                    38
-            );
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            45,
-                            180,
-                            getWidth() - 45,
-                            360
-                    ),
-                    24,
-                    24,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    "YOUR SCORE",
-                    getWidth() / 2f,
-                    225,
-                    14,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    String.valueOf(score),
-                    getWidth() / 2f,
-                    270,
-                    34,
-                    Color.rgb(
-                            70,
-                            70,
-                            80
-                    ),
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    "BEST SCORE",
-                    getWidth() / 2f,
-                    315,
-                    14,
-                    Color.GRAY,
-                    true
-            );
-
-            drawText(
-                    canvas,
-                    String.valueOf(
-                            highScore
-                    ),
-                    getWidth() / 2f,
-                    345,
-                    25,
-                    Color.rgb(
-                            245,
-                            155,
-                            45
-                    ),
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    "PLAY AGAIN",
-                    getWidth() / 2f,
-                    450,
-                    250,
-                    65,
-                    Color.rgb(
-                            85,
-                            190,
-                            110
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "MAIN MENU",
-                    getWidth() / 2f,
-                    535,
-                    250,
-                    65,
-                    Color.rgb(
-                            180,
-                            105,
-                            220
-                    )
-            );
-        }
-
-        // =========================================================
-        // PAUSE
-        // =========================================================
-
-        private void drawPauseOverlay(
-                Canvas canvas
-        ) {
-
-            paint.setColor(
-                    Color.argb(
-                            190,
-                            20,
-                            15,
-                            35
-                    )
-            );
-
-            canvas.drawRect(
-                    0,
-                    0,
-                    getWidth(),
-                    getHeight(),
-                    paint
-            );
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            35,
-                            120,
-                            getWidth() - 35,
-                            getHeight() - 100
-                    ),
-                    28,
-                    28,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    "CandyJolt",
-                    getWidth() / 2f,
-                    175,
-                    32,
-                    Color.rgb(
-                            180,
-                            105,
-                            220
-                    ),
-                    true
-            );
-
-            drawButton(
-                    canvas,
-                    "RESUME",
-                    getWidth() / 2f,
-                    260,
-                    230,
-                    58,
-                    Color.rgb(
-                            85,
-                            190,
-                            110
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "RESTART",
-                    getWidth() / 2f,
-                    335,
-                    230,
-                    58,
-                    Color.rgb(
-                            90,
-                            145,
-                            235
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "SETTINGS",
-                    getWidth() / 2f,
-                    410,
-                    230,
-                    58,
-                    Color.rgb(
-                            255,
-                            165,
-                            65
-                    )
-            );
-
-            drawButton(
-                    canvas,
-                    "MAIN MENU",
-                    getWidth() / 2f,
-                    485,
-                    230,
-                    58,
-                    Color.rgb(
-                            180,
-                            105,
-                            220
-                    )
-            );
-
-            drawText(
-                    canvas,
-                    "Keep Playing Keep Smiling!",
-                    getWidth() / 2f,
-                    getHeight() - 135,
-                    16,
-                    Color.DKGRAY,
-                    true
-            );
-        }
-
-        // =========================================================
-        // HEADER
-        // =========================================================
-
-        private void drawHeader(
-                Canvas canvas,
-                String title,
-                boolean back,
-                boolean home
-        ) {
-
-            paint.setColor(Color.WHITE);
-
-            canvas.drawRect(
-                    0,
-                    0,
-                    getWidth(),
-                    82,
-                    paint
-            );
-
-            if (back) {
-
-                drawText(
-                        canvas,
-                        "‹",
-                        30,
-                        55,
-                        42,
-                        Color.DKGRAY,
-                        true
-                );
+                        if (possible) return true;
+                    }
+                }
             }
 
-            drawText(
-                    canvas,
-                    title,
-                    getWidth() / 2f,
-                    52,
-                    24,
-                    Color.rgb(
-                            75,
-                            65,
-                            85
-                    ),
-                    true
-            );
+            return false;
+        }
 
-            if (home) {
+        void shuffleBoard() {
 
-                drawText(
-                        canvas,
-                        "⌂",
-                        getWidth() - 32,
-                        54,
-                        28,
-                        Color.DKGRAY,
-                        true
-                );
+            ArrayList<Integer> values = new ArrayList<>();
+
+            for (int r = 0; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    values.add(board[r][c]);
+                }
             }
+
+            do {
+                java.util.Collections.shuffle(values, random);
+
+                int i = 0;
+
+                for (int r = 0; r < ROWS; r++) {
+                    for (int c = 0; c < COLS; c++) {
+                        board[r][c] = values.get(i++);
+                    }
+                }
+
+            } while (!findMatches().isEmpty() ||
+                    !hasPossibleMoves());
         }
-
-        private void drawMuteButton(
-                Canvas canvas
-        ) {
-
-            drawButton(
-                    canvas,
-                    musicOn
-                            ? "🔊"
-                            : "🔇",
-                    getWidth() - 45,
-                    45,
-                    55,
-                    45,
-                    Color.WHITE
-            );
-        }
-
-        // =========================================================
-        // HELPERS
-        // =========================================================
-
-        private boolean inside(
-                float x,
-                float y,
-                float cx,
-                float cy,
-                float w,
-                float h
-        ) {
-
-            return x >= cx - w / 2
-                    && x <= cx + w / 2
-                    && y >= cy - h / 2
-                    && y <= cy + h / 2;
-        }
-
-        private void drawBackground(
-                Canvas canvas
-        ) {
-
-            paint.setColor(
-                    Color.rgb(
-                            250,
-                            244,
-                            255
-                    )
-            );
-
-            canvas.drawRect(
-                    0,
-                    0,
-                    getWidth(),
-                    getHeight(),
-                    paint
-            );
-
-            paint.setColor(
-                    Color.argb(
-                            45,
-                            245,
-                            75,
-                            100
-                    )
-            );
-
-            canvas.drawCircle(
-                    30,
-                    100,
-                    70,
-                    paint
-            );
-
-            paint.setColor(
-                    Color.argb(
-                            40,
-                            80,
-                            190,
-                            110
-                    )
-            );
-
-            canvas.drawCircle(
-                    getWidth() - 20,
-                    getHeight() - 80,
-                    90,
-                    paint
-            );
-        }
-
-        private void drawTitle(
-                Canvas canvas,
-                String text,
-                float x,
-                float y,
-                float size
-        ) {
-
-            drawText(
-                    canvas,
-                    text,
-                    x,
-                    y,
-                    size,
-                    Color.rgb(
-                            180,
-                            90,
-                            210
-                    ),
-                    true
-            );
-        }
-
-        private void drawText(
-                Canvas canvas,
-                String text,
-                float x,
-                float y,
-                float size,
-                int color,
-                boolean bold
-        ) {
-
-            paint.setColor(color);
-
-            paint.setTextSize(size);
-
-            paint.setTextAlign(
-                    Paint.Align.CENTER
-            );
-
-            paint.setTypeface(
-                    Typeface.create(
-                            Typeface.DEFAULT,
-                            bold
-                                    ? Typeface.BOLD
-                                    : Typeface.NORMAL
-                    )
-            );
-
-            canvas.drawText(
-                    text,
-                    x,
-                    y,
-                    paint
-            );
-        }
-
-        private void drawButton(
-                Canvas canvas,
-                String text,
-                float cx,
-                float cy,
-                float w,
-                float h,
-                int color
-        ) {
-
-            paint.setColor(color);
-
-            canvas.drawRoundRect(
-                    new RectF(
-                            cx - w / 2,
-                            cy - h / 2,
-                            cx + w / 2,
-                            cy + h / 2
-                    ),
-                    20,
-                    20,
-                    paint
-            );
-
-            drawText(
-                    canvas,
-                    text,
-                    cx,
-                    cy + 7,
-                    17,
-                    color == Color.WHITE
-                            ? Color.DKGRAY
-                            : Color.WHITE,
-                    true
-            );
-        }
-
-        // =========================================================
-        // CLEANUP
-        // =========================================================
 
         @Override
         protected void onDetachedFromWindow() {
-
-            stopTimer();
-            releaseSound();
-
+            handler.removeCallbacks(timer);
             super.onDetachedFromWindow();
-        }
-    }
-
-    // =============================================================
-    // CANDY
-    // =============================================================
-
-    public static class Candy {
-
-        int row;
-        int col;
-
-        int colorIndex;
-        int shape;
-
-        boolean selected = false;
-
-        Candy(
-                int row,
-                int col,
-                int colorIndex,
-                int shape
-        ) {
-
-            this.row = row;
-            this.col = col;
-
-            this.colorIndex =
-                    colorIndex;
-
-            this.shape = shape;
-        }
-    }
-
-    // =============================================================
-    // CELL
-    // =============================================================
-
-    public static class Cell {
-
-        int row;
-        int col;
-
-        Cell(
-                int row,
-                int col
-        ) {
-
-            this.row = row;
-            this.col = col;
         }
     }
 }
