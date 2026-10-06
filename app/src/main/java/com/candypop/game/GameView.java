@@ -42,9 +42,18 @@ public class GameView extends View {
 
     private int level = 1;
     private int score = 0;
+
     private int target;
     private int collected = 0;
+
     private int timeLeft;
+    private int levelTime;
+
+    private int minimumMatch;
+    private int requiredLongMatches;
+    private int longMatches;
+
+    private String objectiveText = "";
 
     private final Handler timerHandler = new Handler();
 
@@ -136,21 +145,67 @@ public class GameView extends View {
                 )
         );
 
-        target = 15 + level * 3;
+        collected = 0;
+        longMatches = 0;
 
         if (level <= 10) {
-            timeLeft = 90;
-        } else if (level <= 30) {
-            timeLeft = 80;
-        } else if (level <= 50) {
-            timeLeft = 70;
-        } else if (level <= 70) {
-            timeLeft = 60;
-        } else if (level <= 90) {
-            timeLeft = 55;
+
+            target = 18 + level * 2;
+            levelTime = 100;
+            minimumMatch = 3;
+            requiredLongMatches = 0;
+            objectiveText = "Easy start";
+
+        } else if (level <= 20) {
+
+            target = 35 + (level - 10) * 2;
+            levelTime = 95;
+            minimumMatch = 3;
+            requiredLongMatches = 0;
+            objectiveText = "Pop more candies";
+
+        } else if (level <= 40) {
+
+            target = 55 + (level - 20) * 3;
+            levelTime = 90;
+            minimumMatch = 3;
+            requiredLongMatches = 2;
+            objectiveText = "Make 4+ candy matches";
+
+        } else if (level <= 60) {
+
+            target = 80 + (level - 40) * 3;
+            levelTime = 80;
+            minimumMatch = 3;
+            requiredLongMatches = 4;
+            objectiveText = "Build long matches";
+
+        } else if (level <= 80) {
+
+            target = 120 + (level - 60) * 3;
+            levelTime = 75;
+            minimumMatch = 4;
+            requiredLongMatches = 5;
+            objectiveText = "Hard mode";
+
+        } else if (level <= 99) {
+
+            target = 180 + (level - 80) * 4;
+            levelTime = 70;
+            minimumMatch = 4;
+            requiredLongMatches = 7;
+            objectiveText = "Expert challenge";
+
         } else {
-            timeLeft = 50;
+
+            target = 300;
+            levelTime = 120;
+            minimumMatch = 4;
+            requiredLongMatches = 10;
+            objectiveText = "CANDYJOLT FINAL CHALLENGE";
         }
+
+        timeLeft = levelTime;
     }
 
     private void createBoard() {
@@ -760,7 +815,7 @@ public class GameView extends View {
 
                 if (drawing) {
 
-                    if (selected.size() >= 3) {
+                    if (selected.size() >= minimumMatch) {
                         removeSelected();
                     }
 
@@ -875,13 +930,25 @@ public class GameView extends View {
         int matched =
                 selected.size();
 
+        if (matched >= 4) {
+            longMatches++;
+        }
+
         for (int[] cell : selected) {
 
             board[cell[0]][cell[1]] =
                     -1;
         }
 
-        score += matched * 10;
+        int bonus = 0;
+
+        if (matched >= 5) {
+            bonus = 50;
+        } else if (matched == 4) {
+            bonus = 25;
+        }
+
+        score += matched * 10 + bonus;
 
         collected += matched;
 
@@ -918,7 +985,20 @@ public class GameView extends View {
             }
         }
 
-        if (collected >= target) {
+        checkLevelComplete();
+    }
+
+    private void checkLevelComplete() {
+
+        boolean targetReached =
+                collected >= target;
+
+        boolean longMatchGoal =
+                longMatches >= requiredLongMatches;
+
+        if (targetReached
+                && longMatchGoal) {
+
             levelComplete();
         }
     }
@@ -933,9 +1013,9 @@ public class GameView extends View {
 
         int stars;
 
-        if (timeLeft >= 60) {
+        if (timeLeft >= levelTime * 0.60f) {
             stars = 3;
-        } else if (timeLeft >= 25) {
+        } else if (timeLeft >= levelTime * 0.25f) {
             stars = 2;
         } else {
             stars = 1;
@@ -955,21 +1035,25 @@ public class GameView extends View {
             starText = "⭐";
         }
 
+        String message =
+                starText
+                        + "\n\n"
+                        + "Level "
+                        + level
+                        + " completed!\n\n"
+                        + "Objective: "
+                        + objectiveText
+                        + "\n\n"
+                        + "Score: "
+                        + score;
+
         new AlertDialog.Builder(
                 getContext()
         )
                 .setTitle(
                         "🎉 LEVEL COMPLETE!"
                 )
-                .setMessage(
-                        starText
-                                + "\n\n"
-                                + "Level "
-                                + level
-                                + " completed!\n\n"
-                                + "Score: "
-                                + score
-                )
+                .setMessage(message)
                 .setCancelable(false)
                 .setPositiveButton(
                         level >= MAX_LEVEL
@@ -984,8 +1068,6 @@ public class GameView extends View {
                             } else {
 
                                 level++;
-
-                                collected = 0;
 
                                 setupLevel();
 
@@ -1012,6 +1094,25 @@ public class GameView extends View {
 
     private void showTimeUpDialog() {
 
+        int remaining =
+                Math.max(
+                        0,
+                        target - collected
+                );
+
+        String extraText = "";
+
+        if (requiredLongMatches > 0
+                && longMatches
+                < requiredLongMatches) {
+
+            extraText =
+                    "\n\nLong matches: "
+                            + longMatches
+                            + " / "
+                            + requiredLongMatches;
+        }
+
         new AlertDialog.Builder(
                 getContext()
         )
@@ -1020,13 +1121,11 @@ public class GameView extends View {
                 )
                 .setMessage(
                         "You needed "
-                                + Math.max(
-                                0,
-                                target - collected
-                        )
+                                + remaining
                                 + " more candies.\n\n"
                                 + "Score: "
                                 + score
+                                + extraText
                 )
                 .setCancelable(false)
                 .setPositiveButton(
@@ -1051,6 +1150,8 @@ public class GameView extends View {
         score = 0;
 
         collected = 0;
+
+        longMatches = 0;
 
         gameFinished = false;
 
