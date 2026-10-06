@@ -50,6 +50,13 @@ public class GameView extends View {
     private boolean gameFinished = false;
     private boolean animating = false;
 
+    /*
+     * These remember the previous finger position.
+     * They help us detect fast swipes and turns.
+     */
+    private float lastTouchX;
+    private float lastTouchY;
+
     private int level = 1;
     private int score = 0;
 
@@ -115,13 +122,7 @@ public class GameView extends View {
 
                 popProgress = 1f;
 
-                /*
-                 * IMPORTANT:
-                 * Mark the selected cells as empty BEFORE
-                 * refilling the board.
-                 */
                 for (int[] cell : poppingCells) {
-
                     board[cell[0]][cell[1]] = -1;
                 }
 
@@ -133,11 +134,6 @@ public class GameView extends View {
 
                 invalidate();
 
-                /*
-                 * Check the level only after the candies
-                 * have actually disappeared and the board
-                 * has been refilled.
-                 */
                 if (collected >= target
                         && longMatches >= requiredLongMatches) {
 
@@ -184,7 +180,9 @@ public class GameView extends View {
         linePaint.setStrokeWidth(20f);
         linePaint.setStrokeCap(Paint.Cap.ROUND);
         linePaint.setStrokeJoin(Paint.Join.ROUND);
-        linePaint.setColor(Color.WHITE);
+        linePaint.setColor(
+                Color.WHITE
+        );
 
         outlinePaint.setAntiAlias(true);
         outlinePaint.setStyle(Paint.Style.STROKE);
@@ -352,6 +350,17 @@ public class GameView extends View {
 
         drawBoardBackground(canvas);
         drawBoard(canvas);
+
+        /*
+         * Make the connection line large and obvious.
+         * It follows the exact candy-to-candy path.
+         */
+        linePaint.setStrokeWidth(
+                Math.max(
+                        14f,
+                        cellSize * 0.18f
+                )
+        );
 
         if (drawing
                 && selected.size() >= 2) {
@@ -576,10 +585,6 @@ public class GameView extends View {
 
                 if (isPopping(row, col)) {
 
-                    /*
-                     * Start large and shrink toward zero.
-                     * This makes the candy visibly disappear.
-                     */
                     scale =
                             1f
                                     - 0.75f
@@ -812,11 +817,16 @@ public class GameView extends View {
                 Paint.Style.STROKE
         );
 
-        paint.setStrokeWidth(5f);
+        paint.setStrokeWidth(
+                Math.max(
+                        4f,
+                        cellSize * 0.045f
+                )
+        );
 
         paint.setColor(
                 Color.argb(
-                        180,
+                        210,
                         255,
                         255,
                         255
@@ -926,6 +936,9 @@ public class GameView extends View {
 
                 connectionPath.reset();
 
+                lastTouchX = x;
+                lastTouchY = y;
+
                 int[] first =
                         getCell(x, y);
 
@@ -958,47 +971,21 @@ public class GameView extends View {
                     return true;
                 }
 
-                int[] current =
-                        getCell(x, y);
+                /*
+                 * Process every cell crossed by the finger.
+                 *
+                 * This is the important part that makes
+                 * fast swipes and changing directions work.
+                 */
+                processTouchMovement(
+                        x,
+                        y
+                );
 
-                if (current != null
-                        && board[current[0]][current[1]] >= 0) {
+                lastTouchX = x;
+                lastTouchY = y;
 
-                    int[] last =
-                            selected.get(
-                                    selected.size() - 1
-                            );
-
-                    if (current[0] != last[0]
-                            || current[1] != last[1]) {
-
-                        if (isAdjacent(
-                                last,
-                                current
-                        )
-                                && board[current[0]][current[1]]
-                                == board[last[0]][last[1]]
-                                && !alreadySelected(
-                                current
-                        )) {
-
-                            selected.add(
-                                    current
-                            );
-
-                            connectionPath.lineTo(
-                                    getCellCenterX(
-                                            current[1]
-                                    ),
-                                    getCellCenterY(
-                                            current[0]
-                                    )
-                            );
-
-                            invalidate();
-                        }
-                    }
-                }
+                invalidate();
 
                 return true;
 
@@ -1030,6 +1017,318 @@ public class GameView extends View {
 
                 return true;
         }
+
+        return true;
+    }
+
+    /*
+     * Converts finger movement into a sequence of
+     * horizontal/vertical candy-to-candy steps.
+     *
+     * This allows:
+     *
+     *  → → →
+     *  ↓
+     *  ← ←
+     *
+     * and many other shapes.
+     */
+    private void processTouchMovement(
+            float x,
+            float y
+    ) {
+
+        int[] current =
+                getCell(x, y);
+
+        if (current == null) {
+            return;
+        }
+
+        int[] last =
+                selected.get(
+                        selected.size() - 1
+                );
+
+        if (current[0] == last[0]
+                && current[1] == last[1]) {
+
+            return;
+        }
+
+        /*
+         * If the finger entered a neighboring cell,
+         * add it immediately.
+         */
+        if (isAdjacent(last, current)) {
+
+            tryAddCell(current);
+
+            return;
+        }
+
+        /*
+         * The touch event may have skipped one or more
+         * cells because the finger moved quickly.
+         *
+         * We walk through the grid one cell at a time.
+         */
+        int rowDifference =
+                current[0] - last[0];
+
+        int colDifference =
+                current[1] - last[1];
+
+        int rowSteps =
+                Math.abs(rowDifference);
+
+        int colSteps =
+                Math.abs(colDifference);
+
+        int rowDirection =
+                Integer.signum(rowDifference);
+
+        int colDirection =
+                Integer.signum(colDifference);
+
+        /*
+         * When both row and column changed, choose the
+         * direction that best matches the actual finger
+         * movement.
+         */
+        float pixelDX =
+                x - lastTouchX;
+
+        float pixelDY =
+                y - lastTouchY;
+
+        if (rowSteps > 0
+                && colSteps > 0) {
+
+            if (Math.abs(pixelDX)
+                    >= Math.abs(pixelDY)) {
+
+                /*
+                 * Move horizontally first.
+                 */
+                for (int i = 0;
+                        i < colSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0],
+                                    last[1]
+                                            + colDirection
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+
+                /*
+                 * Then move vertically.
+                 */
+                for (int i = 0;
+                        i < rowSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0]
+                                            + rowDirection,
+                                    last[1]
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+
+            } else {
+
+                /*
+                 * Move vertically first.
+                 */
+                for (int i = 0;
+                        i < rowSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0]
+                                            + rowDirection,
+                                    last[1]
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+
+                /*
+                 * Then move horizontally.
+                 */
+                for (int i = 0;
+                        i < colSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0],
+                                    last[1]
+                                            + colDirection
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+            }
+
+        } else {
+
+            /*
+             * Only one direction changed.
+             */
+            if (rowSteps > 0) {
+
+                for (int i = 0;
+                        i < rowSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0]
+                                            + rowDirection,
+                                    last[1]
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+
+            } else {
+
+                for (int i = 0;
+                        i < colSteps;
+                        i++) {
+
+                    int[] next =
+                            new int[]{
+                                    last[0],
+                                    last[1]
+                                            + colDirection
+                            };
+
+                    if (!tryAddCell(next)) {
+                        return;
+                    }
+
+                    last =
+                            selected.get(
+                                    selected.size() - 1
+                            );
+                }
+            }
+        }
+    }
+
+    /*
+     * Adds one candy to the path only when:
+     *
+     * 1. It is inside the board.
+     * 2. It is directly adjacent.
+     * 3. It is the same candy type.
+     * 4. It has not already been selected.
+     */
+    private boolean tryAddCell(
+            int[] cell
+    ) {
+
+        if (cell == null) {
+            return false;
+        }
+
+        int row = cell[0];
+        int col = cell[1];
+
+        if (row < 0
+                || row >= ROWS
+                || col < 0
+                || col >= COLS) {
+
+            return false;
+        }
+
+        int[] last =
+                selected.get(
+                        selected.size() - 1
+                );
+
+        if (!isAdjacent(last, cell)) {
+            return false;
+        }
+
+        if (board[row][col] < 0) {
+            return false;
+        }
+
+        /*
+         * Same candy type only.
+         */
+        if (board[row][col]
+                != board[last[0]][last[1]]) {
+
+            return false;
+        }
+
+        /*
+         * Do not allow the path to jump through
+         * an already selected candy.
+         */
+        if (alreadySelected(cell)) {
+            return false;
+        }
+
+        selected.add(
+                new int[]{
+                        row,
+                        col
+                }
+        );
+
+        connectionPath.lineTo(
+                getCellCenterX(col),
+                getCellCenterY(row)
+        );
 
         return true;
     }
@@ -1203,10 +1502,6 @@ public class GameView extends View {
 
     private void refillBoard() {
 
-        /*
-         * Move existing candies downward.
-         * Empty cells are represented by -1.
-         */
         for (int col = 0;
                 col < COLS;
                 col++) {
@@ -1228,10 +1523,6 @@ public class GameView extends View {
                 }
             }
 
-            /*
-             * Fill all empty cells at the top
-             * with new candies.
-             */
             while (writeRow >= 0) {
 
                 board[writeRow][col] =
