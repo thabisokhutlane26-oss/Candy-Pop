@@ -28,9 +28,13 @@ public class GameView extends View {
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hudPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint effectPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final int[][] board = new int[ROWS][COLS];
+
     private final List<int[]> selected = new ArrayList<>();
+    private final List<int[]> poppingCells = new ArrayList<>();
+
     private final Path connectionPath = new Path();
 
     private float cellSize;
@@ -39,6 +43,7 @@ public class GameView extends View {
 
     private boolean drawing = false;
     private boolean gameFinished = false;
+    private boolean animating = false;
 
     private int level = 1;
     private int score = 0;
@@ -55,7 +60,14 @@ public class GameView extends View {
 
     private String objectiveText = "";
 
+    private int comboCount = 0;
+    private int comboDisplay = 0;
+    private long comboUntil = 0;
+
+    private float popProgress = 0f;
+
     private final Handler timerHandler = new Handler();
+    private final Handler animationHandler = new Handler();
 
     private final Runnable timerRunnable = new Runnable() {
         @Override
@@ -84,6 +96,38 @@ public class GameView extends View {
 
                 showTimeUpDialog();
             }
+        }
+    };
+
+    private final Runnable animationRunnable = new Runnable() {
+        @Override
+        public void run() {
+
+            if (!animating) {
+                return;
+            }
+
+            popProgress += 0.12f;
+
+            if (popProgress >= 1f) {
+
+                animating = false;
+
+                poppingCells.clear();
+
+                refillBoard();
+
+                invalidate();
+
+                return;
+            }
+
+            invalidate();
+
+            animationHandler.postDelayed(
+                    this,
+                    25
+            );
         }
     };
 
@@ -124,6 +168,14 @@ public class GameView extends View {
                 android.graphics.Typeface.DEFAULT_BOLD
         );
 
+        effectPaint.setAntiAlias(true);
+        effectPaint.setTextAlign(
+                Paint.Align.CENTER
+        );
+        effectPaint.setTypeface(
+                android.graphics.Typeface.DEFAULT_BOLD
+        );
+
         createBoard();
         setupLevel();
 
@@ -147,6 +199,8 @@ public class GameView extends View {
 
         collected = 0;
         longMatches = 0;
+        comboCount = 0;
+        comboDisplay = 0;
 
         if (level <= 10) {
 
@@ -282,6 +336,7 @@ public class GameView extends View {
         }
 
         drawSelection(canvas);
+        drawCombo(canvas);
     }
 
     private void drawHud(Canvas canvas) {
@@ -475,6 +530,12 @@ public class GameView extends View {
 
             for (int col = 0; col < COLS; col++) {
 
+                int type = board[row][col];
+
+                if (type < 0) {
+                    continue;
+                }
+
                 float centerX =
                         getCellCenterX(col);
 
@@ -484,12 +545,22 @@ public class GameView extends View {
                 float radius =
                         cellSize * 0.32f;
 
+                float scale = 1f;
+
+                if (isPopping(row, col)) {
+
+                    scale =
+                            1f
+                                    + 0.35f
+                                    * popProgress;
+                }
+
                 drawCandy(
                         canvas,
                         centerX,
                         centerY,
-                        radius,
-                        board[row][col]
+                        radius * scale,
+                        type
                 );
             }
         }
@@ -677,6 +748,23 @@ public class GameView extends View {
         );
     }
 
+    private boolean isPopping(
+            int row,
+            int col
+    ) {
+
+        for (int[] cell : poppingCells) {
+
+            if (cell[0] == row
+                    && cell[1] == col) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void drawSelection(
             Canvas canvas
     ) {
@@ -715,12 +803,80 @@ public class GameView extends View {
         );
     }
 
+    private void drawCombo(
+            Canvas canvas
+    ) {
+
+        if (comboDisplay <= 0
+                || System.currentTimeMillis()
+                > comboUntil) {
+
+            return;
+        }
+
+        effectPaint.setTextSize(
+                Math.max(
+                        30f,
+                        cellSize * 0.48f
+                )
+        );
+
+        effectPaint.setColor(
+                Color.rgb(
+                        124,
+                        77,
+                        255
+                )
+        );
+
+        float alpha =
+                Math.max(
+                        0f,
+                        Math.min(
+                                1f,
+                                (comboUntil
+                                        - System.currentTimeMillis())
+                                        / 900f
+                        )
+                );
+
+        effectPaint.setAlpha(
+                (int) (
+                        alpha * 255
+                )
+        );
+
+        String text =
+                comboDisplay == 2
+                        ? "COMBO x2!"
+                        : comboDisplay == 3
+                        ? "COMBO x3!"
+                        : comboDisplay >= 4
+                        ? "COMBO x"
+                        + comboDisplay
+                        + "!"
+                        : "NICE!";
+
+        canvas.drawText(
+                text,
+                getWidth() / 2f,
+                boardTop - 20,
+                effectPaint
+        );
+
+        effectPaint.setAlpha(255);
+
+        postInvalidateDelayed(40);
+    }
+
     @Override
     public boolean onTouchEvent(
             MotionEvent event
     ) {
 
-        if (gameFinished) {
+        if (gameFinished
+                || animating) {
+
             return true;
         }
 
@@ -815,7 +971,9 @@ public class GameView extends View {
 
                 if (drawing) {
 
-                    if (selected.size() >= minimumMatch) {
+                    if (selected.size()
+                            >= minimumMatch) {
+
                         removeSelected();
                     }
 
@@ -927,6 +1085,10 @@ public class GameView extends View {
 
     private void removeSelected() {
 
+        if (animating) {
+            return;
+        }
+
         int matched =
                 selected.size();
 
@@ -934,11 +1096,17 @@ public class GameView extends View {
             longMatches++;
         }
 
-        for (int[] cell : selected) {
+        comboCount++;
 
-            board[cell[0]][cell[1]] =
-                    -1;
-        }
+        comboDisplay =
+                Math.max(
+                        1,
+                        comboCount
+                );
+
+        comboUntil =
+                System.currentTimeMillis()
+                        + 1200;
 
         int bonus = 0;
 
@@ -948,9 +1116,76 @@ public class GameView extends View {
             bonus = 25;
         }
 
-        score += matched * 10 + bonus;
+        int comboBonus =
+                Math.max(
+                        0,
+                        comboCount - 1
+                ) * 15;
+
+        score +=
+                matched * 10
+                        + bonus
+                        + comboBonus;
 
         collected += matched;
+
+        poppingCells.clear();
+
+        for (int[] cell : selected) {
+
+            poppingCells.add(
+                    new int[]{
+                            cell[0],
+                            cell[1]
+                    }
+            );
+        }
+
+        popProgress = 0f;
+        animating = true;
+
+        animationHandler.removeCallbacks(
+                animationRunnable
+        );
+
+        animationHandler.post(
+                animationRunnable
+        );
+
+        checkLevelCompleteAfterMatch();
+    }
+
+    private void checkLevelCompleteAfterMatch() {
+
+        boolean targetReached =
+                collected >= target;
+
+        boolean longMatchGoal =
+                longMatches >= requiredLongMatches;
+
+        if (targetReached
+                && longMatchGoal) {
+
+            animationHandler.removeCallbacks(
+                    animationRunnable
+            );
+
+            animating = false;
+
+            poppingCells.clear();
+
+            refillBoard();
+
+            levelComplete();
+        }
+    }
+
+    private void refillBoard() {
+
+        for (int[] cell : poppingCells) {
+
+            board[cell[0]][cell[1]] = -1;
+        }
 
         for (int col = 0;
                 col < COLS;
@@ -985,22 +1220,9 @@ public class GameView extends View {
             }
         }
 
-        checkLevelComplete();
-    }
+        poppingCells.clear();
 
-    private void checkLevelComplete() {
-
-        boolean targetReached =
-                collected >= target;
-
-        boolean longMatchGoal =
-                longMatches >= requiredLongMatches;
-
-        if (targetReached
-                && longMatchGoal) {
-
-            levelComplete();
-        }
+        invalidate();
     }
 
     private void levelComplete() {
@@ -1147,11 +1369,23 @@ public class GameView extends View {
                 timerRunnable
         );
 
+        animationHandler.removeCallbacks(
+                animationRunnable
+        );
+
         score = 0;
 
         collected = 0;
 
         longMatches = 0;
+
+        comboCount = 0;
+
+        comboDisplay = 0;
+
+        animating = false;
+
+        poppingCells.clear();
 
         gameFinished = false;
 
@@ -1171,6 +1405,10 @@ public class GameView extends View {
 
         timerHandler.removeCallbacks(
                 timerRunnable
+        );
+
+        animationHandler.removeCallbacks(
+                animationRunnable
         );
 
         Context context = getContext();
@@ -1224,6 +1462,10 @@ public class GameView extends View {
 
         timerHandler.removeCallbacks(
                 timerRunnable
+        );
+
+        animationHandler.removeCallbacks(
+                animationRunnable
         );
 
         super.onDetachedFromWindow();
