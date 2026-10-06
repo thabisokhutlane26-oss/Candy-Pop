@@ -2,6 +2,7 @@ package com.candypop.game;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.*;
 import android.os.Bundle;
@@ -10,7 +11,6 @@ import android.os.Vibrator;
 import android.view.MotionEvent;
 import android.view.View;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Random;
@@ -54,9 +54,6 @@ public class MainActivity extends Activity {
         boolean soundOn = true;
         boolean vibrationOn = true;
 
-        float downX;
-        float downY;
-
         static final int ROWS = 7;
         static final int COLS = 7;
 
@@ -69,30 +66,6 @@ public class MainActivity extends Activity {
                 Color.rgb(90, 210, 120),
                 Color.rgb(180, 100, 245),
                 Color.rgb(255, 140, 55)
-        };
-
-        Runnable timer = new Runnable() {
-            @Override
-            public void run() {
-                if (screen == GAME && !paused) {
-                    timeLeft--;
-
-                    if (timeLeft <= 0) {
-                        timeLeft = 0;
-
-                        if (collected >= target) {
-                            completeLevel();
-                        } else {
-                            screen = GAMEOVER;
-                            handler.removeCallbacks(this);
-                        }
-                    } else {
-                        handler.postDelayed(this, 1000);
-                    }
-
-                    invalidate();
-                }
-            }
         };
 
         CandyJoltView(Context context) {
@@ -148,10 +121,15 @@ public class MainActivity extends Activity {
             }
         }
 
-        void drawText(Canvas canvas, String value,
-                      float x, float y, float size,
-                      int color, Paint.Align align) {
-
+        void drawText(
+                Canvas canvas,
+                String value,
+                float x,
+                float y,
+                float size,
+                int color,
+                Paint.Align align
+        ) {
             p.setStyle(Paint.Style.FILL);
             p.setColor(color);
             p.setTextSize(size);
@@ -164,11 +142,15 @@ public class MainActivity extends Activity {
             canvas.drawText(value, x, y, p);
         }
 
-        void roundRect(Canvas canvas,
-                       float left, float top,
-                       float right, float bottom,
-                       float radius, int color) {
-
+        void roundRect(
+                Canvas canvas,
+                float left,
+                float top,
+                float right,
+                float bottom,
+                float radius,
+                int color
+        ) {
             p.setStyle(Paint.Style.FILL);
             p.setColor(color);
 
@@ -186,6 +168,7 @@ public class MainActivity extends Activity {
         void drawHeader(Canvas canvas, String title) {
 
             p.setColor(Color.rgb(255, 92, 135));
+
             canvas.drawRect(
                     0,
                     0,
@@ -215,14 +198,15 @@ public class MainActivity extends Activity {
             );
         }
 
-        void button(Canvas canvas,
-                    String label,
-                    float left,
-                    float top,
-                    float right,
-                    float bottom,
-                    int color) {
-
+        void button(
+                Canvas canvas,
+                String label,
+                float left,
+                float top,
+                float right,
+                float bottom,
+                int color
+        ) {
             roundRect(
                     canvas,
                     left,
@@ -389,7 +373,9 @@ public class MainActivity extends Activity {
 
                 drawText(
                         canvas,
-                        unlocked ? String.valueOf(i) : "🔒",
+                        unlocked
+                                ? String.valueOf(i)
+                                : "🔒",
                         left + size / 2f,
                         top + size / 2f + 8,
                         unlocked ? 25 : 20,
@@ -409,6 +395,9 @@ public class MainActivity extends Activity {
             );
         }
 
+        /*
+         * PLAY now opens the new full-screen GameActivity.
+         */
         void startGame(int selectedLevel) {
 
             level = Math.max(
@@ -431,12 +420,17 @@ public class MainActivity extends Activity {
 
             createBoard();
 
-            screen = GAME;
+            Intent intent = new Intent(
+                    getContext(),
+                    GameActivity.class
+            );
 
-            handler.removeCallbacks(timer);
-            handler.postDelayed(timer, 1000);
+            intent.putExtra(
+                    "level",
+                    level
+            );
 
-            invalidate();
+            getContext().startActivity(intent);
         }
 
         void createBoard() {
@@ -462,21 +456,24 @@ public class MainActivity extends Activity {
             int value;
 
             do {
+
                 value =
                         random.nextInt(
                                 candyColors.length
                         );
 
             } while (
-                    column >= 2
-                            && board[row][column - 1] == value
-                            && board[row][column - 2] == value
-
+                    (
+                            column >= 2
+                                    && board[row][column - 1] == value
+                                    && board[row][column - 2] == value
+                    )
                     ||
-
-                    row >= 2
-                            && board[row - 1][column] == value
-                            && board[row - 2][column] == value
+                    (
+                            row >= 2
+                                    && board[row - 1][column] == value
+                                    && board[row - 2][column] == value
+                    )
             );
 
             return value;
@@ -604,11 +601,13 @@ public class MainActivity extends Activity {
             }
         }
 
-        void drawCandy(Canvas canvas,
-                       float x,
-                       float y,
-                       float radius,
-                       int type) {
+        void drawCandy(
+                Canvas canvas,
+                float x,
+                float y,
+                float radius,
+                int type
+        ) {
 
             int color = candyColors[type];
 
@@ -681,7 +680,10 @@ public class MainActivity extends Activity {
 
                 star.close();
 
-                canvas.drawPath(star, p);
+                canvas.drawPath(
+                        star,
+                        p
+                );
 
             } else if (type == 3) {
 
@@ -735,7 +737,6 @@ public class MainActivity extends Activity {
                         p
                 );
 
-                // FIXED: set the Paint color before drawCircle().
                 p.setColor(lighten(color));
 
                 canvas.drawCircle(
@@ -938,8 +939,6 @@ public class MainActivity extends Activity {
 
         void completeLevel() {
 
-            handler.removeCallbacks(timer);
-
             if (score > bestScore) {
                 bestScore = score;
 
@@ -1076,10 +1075,12 @@ public class MainActivity extends Activity {
             );
         }
 
-        void setting(Canvas canvas,
-                     String name,
-                     boolean enabled,
-                     int y) {
+        void setting(
+                Canvas canvas,
+                String name,
+                boolean enabled,
+                int y
+        ) {
 
             drawText(
                     canvas,
@@ -1215,37 +1216,12 @@ public class MainActivity extends Activity {
         @Override
         public boolean onTouchEvent(MotionEvent event) {
 
-            float x = event.getX();
-            float y = event.getY();
+            if (event.getAction() == MotionEvent.ACTION_UP) {
 
-            if (event.getAction()
-                    == MotionEvent.ACTION_DOWN) {
-
-                downX = x;
-                downY = y;
-
-                return true;
-            }
-
-            if (event.getAction()
-                    == MotionEvent.ACTION_UP) {
-
-                float dx = x - downX;
-                float dy = y - downY;
-
-                if (screen == GAME
-                        && !paused
-                        && Math.max(
-                        Math.abs(dx),
-                        Math.abs(dy)
-                ) > 35) {
-
-                    handleSwipe(dx, dy);
-
-                } else {
-
-                    handleTap(x, y);
-                }
+                handleTap(
+                        event.getX(),
+                        event.getY()
+                );
 
                 return true;
             }
@@ -1281,10 +1257,7 @@ public class MainActivity extends Activity {
                     musicOn = !musicOn;
 
                     prefs.edit()
-                            .putBoolean(
-                                    "music",
-                                    musicOn
-                            )
+                            .putBoolean("music", musicOn)
                             .apply();
 
                     invalidate();
@@ -1312,12 +1285,10 @@ public class MainActivity extends Activity {
                             (i - 1) / 3;
 
                     float left =
-                            25 + column
-                                    * (size + gap);
+                            25 + column * (size + gap);
 
                     float top =
-                            startY + row
-                                    * (size + gap);
+                            startY + row * (size + gap);
 
                     if (x >= left
                             && x <= left + size
@@ -1330,121 +1301,36 @@ public class MainActivity extends Activity {
                     }
                 }
 
-            } else if (screen == GAME) {
-
-                if (paused) {
-
-                    if (y >= 275
-                            && y <= 335) {
-
-                        paused = false;
-                        invalidate();
-
-                    } else if (y >= 350
-                            && y <= 410) {
-
-                        startGame(level);
-
-                    } else if (y >= 425
-                            && y <= 485) {
-
-                        paused = false;
-                        screen = HOME;
-
-                        handler.removeCallbacks(timer);
-
-                        invalidate();
-                    }
-
-                } else if (y < 150
-                        && x > getWidth() - 80) {
-
-                    paused = true;
-                    invalidate();
-                }
-
-            } else if (screen == COMPLETE) {
-
-                if (y >= 355
-                        && y <= 415) {
-
-                    startGame(
-                            Math.min(
-                                    30,
-                                    level + 1
-                            )
-                    );
-
-                } else if (y >= 430
-                        && y <= 490) {
-
-                    startGame(level);
-
-                } else if (y >= 505
-                        && y <= 565) {
-
-                    screen = HOME;
-                    invalidate();
-                }
-
-            } else if (screen == GAMEOVER) {
-
-                if (y >= 350
-                        && y <= 415) {
-
-                    startGame(level);
-
-                } else if (y >= 430
-                        && y <= 495) {
-
-                    screen = HOME;
-                    invalidate();
-                }
-
             } else if (screen == SETTINGS) {
 
-                if (y >= 100
-                        && y <= 170) {
+                if (y >= 100 && y <= 170) {
 
                     musicOn = !musicOn;
 
-                } else if (y >= 175
-                        && y <= 245) {
+                } else if (y >= 175 && y <= 245) {
 
                     soundOn = !soundOn;
 
-                } else if (y >= 250
-                        && y <= 320) {
+                } else if (y >= 250 && y <= 320) {
 
                     vibrationOn = !vibrationOn;
 
-                } else if (y >= 360
-                        && y <= 450) {
+                } else if (y >= 360 && y <= 450) {
 
                     screen = HOME;
                 }
 
                 prefs.edit()
-                        .putBoolean(
-                                "music",
-                                musicOn
-                        )
-                        .putBoolean(
-                                "sound",
-                                soundOn
-                        )
-                        .putBoolean(
-                                "vibration",
-                                vibrationOn
-                        )
+                        .putBoolean("music", musicOn)
+                        .putBoolean("sound", soundOn)
+                        .putBoolean("vibration", vibrationOn)
                         .apply();
 
                 invalidate();
 
             } else if (screen == SCORES) {
 
-                if (y >= 490
-                        && y <= 580) {
+                if (y >= 490 && y <= 580) {
 
                     screen = HOME;
                     invalidate();
@@ -1452,401 +1338,18 @@ public class MainActivity extends Activity {
             }
         }
 
-        void handleSwipe(float dx, float dy) {
-
-            float boardSize =
-                    Math.min(
-                            getWidth() - 24,
-                            getHeight() - 260
-                    );
-
-            float cell =
-                    boardSize / COLS;
-
-            float left =
-                    (getWidth() - boardSize) / 2f;
-
-            float top = 175;
-
-            int column =
-                    (int) ((downX - left) / cell);
-
-            int row =
-                    (int) ((downY - top) / cell);
-
-            if (row < 0
-                    || row >= ROWS
-                    || column < 0
-                    || column >= COLS) {
-                return;
-            }
-
-            int newRow = row;
-            int newColumn = column;
-
-            if (Math.abs(dx)
-                    > Math.abs(dy)) {
-
-                newColumn +=
-                        dx > 0 ? 1 : -1;
-
-            } else {
-
-                newRow +=
-                        dy > 0 ? 1 : -1;
-            }
-
-            if (newRow < 0
-                    || newRow >= ROWS
-                    || newColumn < 0
-                    || newColumn >= COLS) {
-                return;
-            }
-
-            swap(
-                    row,
-                    column,
-                    newRow,
-                    newColumn
-            );
-
-            if (findMatches().isEmpty()) {
-
-                swap(
-                        row,
-                        column,
-                        newRow,
-                        newColumn
-                );
-
-            } else {
-
-                combo = 0;
-                resolveBoard();
-            }
-
-            invalidate();
-        }
-
-        void swap(
-                int row1,
-                int column1,
-                int row2,
-                int column2) {
-
-            int temp =
-                    board[row1][column1];
-
-            board[row1][column1] =
-                    board[row2][column2];
-
-            board[row2][column2] =
-                    temp;
-        }
-
-        Set<String> findMatches() {
-
-            Set<String> matches =
-                    new HashSet<>();
-
-            // Horizontal matches
-            for (int row = 0;
-                 row < ROWS;
-                 row++) {
-
-                int start = 0;
-
-                for (int column = 1;
-                     column <= COLS;
-                     column++) {
-
-                    boolean same =
-                            column < COLS
-                                    && board[row][column]
-                                    == board[row][start];
-
-                    if (!same) {
-
-                        int length =
-                                column - start;
-
-                        if (length >= 3) {
-
-                            for (int c = start;
-                                 c < column;
-                                 c++) {
-
-                                matches.add(
-                                        row + "," + c
-                                );
-                            }
-                        }
-
-                        start = column;
-                    }
-                }
-            }
-
-            // Vertical matches
-            for (int column = 0;
-                 column < COLS;
-                 column++) {
-
-                int start = 0;
-
-                for (int row = 1;
-                     row <= ROWS;
-                     row++) {
-
-                    boolean same =
-                            row < ROWS
-                                    && board[row][column]
-                                    == board[start][column];
-
-                    if (!same) {
-
-                        int length =
-                                row - start;
-
-                        if (length >= 3) {
-
-                            for (int r = start;
-                                 r < row;
-                                 r++) {
-
-                                matches.add(
-                                        r + "," + column
-                                );
-                            }
-                        }
-
-                        start = row;
-                    }
-                }
-            }
-
-            return matches;
-        }
-
-        void resolveBoard() {
-
-            Set<String> matches;
-
-            while (!(matches =
-                    findMatches()).isEmpty()) {
-
-                combo++;
-
-                int amount =
-                        matches.size();
-
-                score +=
-                        amount * 20 * combo;
-
-                collected += amount;
-
-                if (vibrationOn) {
-
-                    try {
-
-                        Vibrator vibrator =
-                                (Vibrator)
-                                        getContext()
-                                                .getSystemService(
-                                                        Context.VIBRATOR_SERVICE
-                                                );
-
-                        if (vibrator != null) {
-                            vibrator.vibrate(35);
-                        }
-
-                    } catch (Exception ignored) {
-                    }
-                }
-
-                for (String key : matches) {
-
-                    String[] parts =
-                            key.split(",");
-
-                    int row =
-                            Integer.parseInt(
-                                    parts[0]
-                            );
-
-                    int column =
-                            Integer.parseInt(
-                                    parts[1]
-                            );
-
-                    board[row][column] = -1;
-                }
-
-                dropCandies();
-
-                if (collected >= target) {
-                    completeLevel();
-                    return;
-                }
-            }
-
-            if (!hasPossibleMoves()) {
-                shuffleBoard();
-            }
-        }
-
-        void dropCandies() {
-
-            for (int column = 0;
-                 column < COLS;
-                 column++) {
-
-                int write =
-                        ROWS - 1;
-
-                for (int row = ROWS - 1;
-                     row >= 0;
-                     row--) {
-
-                    if (board[row][column] != -1) {
-
-                        board[write][column] =
-                                board[row][column];
-
-                        write--;
-                    }
-                }
-
-                while (write >= 0) {
-
-                    board[write][column] =
-                            random.nextInt(
-                                    candyColors.length
-                            );
-
-                    write--;
-                }
-            }
-        }
-
         boolean hasPossibleMoves() {
-
-            for (int row = 0;
-                 row < ROWS;
-                 row++) {
-
-                for (int column = 0;
-                     column < COLS;
-                     column++) {
-
-                    if (column + 1 < COLS) {
-
-                        swap(
-                                row,
-                                column,
-                                row,
-                                column + 1
-                        );
-
-                        boolean possible =
-                                !findMatches()
-                                        .isEmpty();
-
-                        swap(
-                                row,
-                                column,
-                                row,
-                                column + 1
-                        );
-
-                        if (possible) {
-                            return true;
-                        }
-                    }
-
-                    if (row + 1 < ROWS) {
-
-                        swap(
-                                row,
-                                column,
-                                row + 1,
-                                column
-                        );
-
-                        boolean possible =
-                                !findMatches()
-                                        .isEmpty();
-
-                        swap(
-                                row,
-                                column,
-                                row + 1,
-                                column
-                        );
-
-                        if (possible) {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            return false;
+            return true;
         }
 
         void shuffleBoard() {
 
-            ArrayList<Integer> values =
-                    new ArrayList<>();
-
-            for (int row = 0;
-                 row < ROWS;
-                 row++) {
-
-                for (int column = 0;
-                     column < COLS;
-                     column++) {
-
-                    values.add(
-                            board[row][column]
-                    );
+            for (int row = 0; row < ROWS; row++) {
+                for (int column = 0; column < COLS; column++) {
+                    board[row][column] =
+                            random.nextInt(candyColors.length);
                 }
             }
-
-            do {
-
-                Collections.shuffle(
-                        values,
-                        random
-                );
-
-                int index = 0;
-
-                for (int row = 0;
-                     row < ROWS;
-                     row++) {
-
-                    for (int column = 0;
-                         column < COLS;
-                         column++) {
-
-                        board[row][column] =
-                                values.get(index++);
-                    }
-                }
-
-            } while (
-                    !findMatches().isEmpty()
-                            || !hasPossibleMoves()
-            );
-        }
-
-        @Override
-        protected void onDetachedFromWindow() {
-
-            handler.removeCallbacks(timer);
-
-            super.onDetachedFromWindow();
         }
     }
 }
