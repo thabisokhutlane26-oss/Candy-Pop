@@ -37,6 +37,11 @@ public class GameView extends View {
 
     private final Path connectionPath = new Path();
 
+    private final Handler timerHandler = new Handler();
+    private final Handler animationHandler = new Handler();
+
+    private final GameSound gameSound;
+
     private float cellSize;
     private float boardLeft;
     private float boardTop;
@@ -65,9 +70,6 @@ public class GameView extends View {
     private long comboUntil = 0;
 
     private float popProgress = 0f;
-
-    private final Handler timerHandler = new Handler();
-    private final Handler animationHandler = new Handler();
 
     private final Runnable timerRunnable = new Runnable() {
         @Override
@@ -142,6 +144,8 @@ public class GameView extends View {
 
     public GameView(Context context) {
         super(context);
+
+        gameSound = new GameSound(context);
 
         paint.setAntiAlias(true);
         paint.setStyle(Paint.Style.FILL);
@@ -975,6 +979,10 @@ public class GameView extends View {
                             >= minimumMatch) {
 
                         removeSelected();
+                    } else {
+
+                        comboCount = 0;
+                        comboDisplay = 0;
                     }
 
                     selected.clear();
@@ -1108,6 +1116,12 @@ public class GameView extends View {
                 System.currentTimeMillis()
                         + 1200;
 
+        if (comboCount >= 2) {
+            gameSound.playCombo();
+        } else {
+            gameSound.playPop();
+        }
+
         int bonus = 0;
 
         if (matched >= 5) {
@@ -1232,6 +1246,8 @@ public class GameView extends View {
         timerHandler.removeCallbacks(
                 timerRunnable
         );
+
+        gameSound.playComplete();
 
         int stars;
 
@@ -1374,13 +1390,9 @@ public class GameView extends View {
         );
 
         score = 0;
-
         collected = 0;
-
         longMatches = 0;
-
         comboCount = 0;
-
         comboDisplay = 0;
 
         animating = false;
@@ -1467,6 +1479,8 @@ public class GameView extends View {
         animationHandler.removeCallbacks(
                 animationRunnable
         );
+
+        gameSound.release();
 
         super.onDetachedFromWindow();
     }
