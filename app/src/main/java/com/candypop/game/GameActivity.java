@@ -21,18 +21,28 @@ public class GameActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
 
-        musicPlayer = MediaPlayer.create(
-                this,
-                R.raw.candy_music
-        );
+        setContentView(new GameView(this));
 
-        if (musicPlayer != null) {
-            musicPlayer.setLooping(true);
-            musicPlayer.setVolume(0.45f, 0.45f);
-            musicPlayer.start();
+        startMusic();
+    }
+
+    private void startMusic() {
+
+        if (musicPlayer == null) {
+            musicPlayer = MediaPlayer.create(
+                    this,
+                    R.raw.candy_music
+            );
+
+            if (musicPlayer != null) {
+                musicPlayer.setLooping(true);
+                musicPlayer.setVolume(0.45f, 0.45f);
+            }
         }
 
-        setContentView(new GameView(this));
+        if (musicPlayer != null && !musicPlayer.isPlaying()) {
+            musicPlayer.start();
+        }
     }
 
     @Override
@@ -48,14 +58,17 @@ public class GameActivity extends Activity {
     protected void onResume() {
         super.onResume();
 
-        if (musicPlayer != null) {
-            musicPlayer.start();
-        }
+        startMusic();
     }
 
     @Override
     protected void onDestroy() {
+
         if (musicPlayer != null) {
+            if (musicPlayer.isPlaying()) {
+                musicPlayer.stop();
+            }
+
             musicPlayer.release();
             musicPlayer = null;
         }
