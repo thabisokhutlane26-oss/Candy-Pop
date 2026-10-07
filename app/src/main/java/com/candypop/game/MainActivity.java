@@ -24,7 +24,6 @@ public class MainActivity extends Activity {
     private final int BLUE = Color.rgb(66, 165, 245);
     private final int CYAN = Color.rgb(38, 198, 218);
     private final int YELLOW = Color.rgb(255, 193, 7);
-    private final int GREEN = Color.rgb(76, 175, 80);
     private final int WHITE = Color.WHITE;
     private final int DARK = Color.rgb(55, 35, 70);
 
@@ -46,6 +45,7 @@ public class MainActivity extends Activity {
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
+
         scrollView.setBackground(
                 createGradient(
                         Color.rgb(255, 214, 239),
@@ -59,11 +59,8 @@ public class MainActivity extends Activity {
         root.setPadding(28, 22, 28, 28);
 
         scrollView.addView(root);
-        setContentView(scrollView);
 
-        // ---------------------------------------------------------
-        // TOP CANDY DECORATION
-        // ---------------------------------------------------------
+        setContentView(scrollView);
 
         TextView candyDecoration = new TextView(this);
         candyDecoration.setText("🍬   🍭   🍓   🍬   🍭");
@@ -78,17 +75,18 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // ---------------------------------------------------------
-        // GAME TITLE
-        // ---------------------------------------------------------
-
         TextView title = new TextView(this);
         title.setText("CANDYJOLT");
         title.setTextSize(38);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(PURPLE);
         title.setGravity(Gravity.CENTER);
-        title.setShadowLayer(7, 0, 4, Color.argb(80, 80, 40, 120));
+        title.setShadowLayer(
+                7,
+                0,
+                4,
+                Color.argb(80, 80, 40, 120)
+        );
 
         root.addView(
                 title,
@@ -114,10 +112,6 @@ public class MainActivity extends Activity {
         );
 
         addSpace(12);
-
-        // ---------------------------------------------------------
-        // PLAYER PROGRESS CARD
-        // ---------------------------------------------------------
 
         LinearLayout progressCard = createCard();
 
@@ -152,6 +146,8 @@ public class MainActivity extends Activity {
                 )
         );
 
+        addRowSpace(statsRow, 6);
+
         statsRow.addView(
                 createStatBox(
                         "BEST SCORE",
@@ -164,6 +160,8 @@ public class MainActivity extends Activity {
                         1
                 )
         );
+
+        addRowSpace(statsRow, 6);
 
         statsRow.addView(
                 createStatBox(
@@ -190,10 +188,6 @@ public class MainActivity extends Activity {
 
         addSpace(18);
 
-        // ---------------------------------------------------------
-        // BIG PLAY BUTTON
-        // ---------------------------------------------------------
-
         Button playButton = createBigButton(
                 "🍭   PLAY NOW   🍭",
                 PINK
@@ -210,10 +204,6 @@ public class MainActivity extends Activity {
         );
 
         addSpace(15);
-
-        // ---------------------------------------------------------
-        // LEVELS + SCORES ROW
-        // ---------------------------------------------------------
 
         LinearLayout firstButtonRow = new LinearLayout(this);
         firstButtonRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -273,10 +263,6 @@ public class MainActivity extends Activity {
 
         addSpace(12);
 
-        // ---------------------------------------------------------
-        // SETTINGS BUTTON
-        // ---------------------------------------------------------
-
         Button settingsButton = createSmallButton(
                 "⚙   SETTINGS",
                 DARK
@@ -298,10 +284,6 @@ public class MainActivity extends Activity {
         );
 
         addSpace(15);
-
-        // ---------------------------------------------------------
-        // FEATURES CARD
-        // ---------------------------------------------------------
 
         LinearLayout featureCard = createCard();
 
@@ -352,11 +334,8 @@ public class MainActivity extends Activity {
 
         addSpace(18);
 
-        // ---------------------------------------------------------
-        // BOTTOM CANDY DECORATION
-        // ---------------------------------------------------------
-
         TextView bottomCandy = new TextView(this);
+
         bottomCandy.setText(
                 "🍓  🍬  🍭  🍫  🍒  🍏\n\n" +
                 "Have fun and make a JOLT! ⚡"
@@ -427,8 +406,8 @@ public class MainActivity extends Activity {
 
         box.setBackground(
                 createRoundedBackground(
-                        Color.argb(40, color),
-                        Color.argb(70, color),
+                        makeTransparent(color, 40),
+                        makeTransparent(color, 70),
                         2,
                         18
                 )
@@ -487,7 +466,7 @@ public class MainActivity extends Activity {
         button.setBackground(
                 createRoundedBackground(
                         color,
-                        Color.argb(90, 70, 30, 100),
+                        makeTransparent(Color.BLACK, 90),
                         3,
                         28
                 )
@@ -513,7 +492,7 @@ public class MainActivity extends Activity {
         button.setBackground(
                 createRoundedBackground(
                         color,
-                        Color.argb(60, 60, 30, 90),
+                        makeTransparent(Color.BLACK, 60),
                         2,
                         22
                 )
@@ -522,21 +501,31 @@ public class MainActivity extends Activity {
         return button;
     }
 
+    private int makeTransparent(
+            int color,
+            int alpha
+    ) {
+
+        return Color.argb(
+                alpha,
+                Color.red(color),
+                Color.green(color),
+                Color.blue(color)
+        );
+    }
+
     private GradientDrawable createGradient(
             int startColor,
             int endColor
     ) {
 
-        GradientDrawable drawable =
-                new GradientDrawable(
-                        GradientDrawable.Orientation.TL_BR,
-                        new int[]{
-                                startColor,
-                                endColor
-                        }
-                );
-
-        return drawable;
+        return new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{
+                        startColor,
+                        endColor
+                }
+        );
     }
 
     private GradientDrawable createRoundedBackground(
