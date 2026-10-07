@@ -732,7 +732,17 @@ public class GameView extends View {
             }
         }
 
-        return false;
+        drawBoard(canvas);
+        drawCombo(canvas);
+        drawObjectivePanel(canvas);
+        drawEffects(canvas);
+
+        if (gameFinished) {
+            drawLevelComplete(canvas);
+        }
+
+        animationHandler.removeCallbacks(animationRunnable);
+        animationHandler.post(animationRunnable);
     }
 
     private boolean findPathLength(
