@@ -14,6 +14,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -126,6 +127,7 @@ public class GameView extends View {
             }
 
             refillBoard();
+
             poppingCells.clear();
             animating = false;
 
@@ -222,12 +224,6 @@ public class GameView extends View {
         }
     }
 
-    /*
-     * REAL 100 LEVEL SYSTEM
-     *
-     * Difficulty intentionally changes:
-     * EASY → HARD → EASY → HARD → EASIEST → HARDEST
-     */
     private void setupLevel() {
 
         score = 0;
@@ -344,7 +340,9 @@ public class GameView extends View {
     }
 
     private boolean levelObjectiveComplete() {
+
         switch (objectiveType) {
+
             case OBJECTIVE_CANDIES:
                 return candiesPoppedThisLevel >= objectiveTarget;
 
@@ -367,18 +365,23 @@ public class GameView extends View {
     }
 
     private String getObjectiveText() {
+
         switch (objectiveType) {
 
             case OBJECTIVE_CANDIES:
                 return "POP "
-                        + Math.max(0,
-                        objectiveTarget - candiesPoppedThisLevel)
+                        + Math.max(
+                        0,
+                        objectiveTarget - candiesPoppedThisLevel
+                )
                         + " CANDIES";
 
             case OBJECTIVE_CONNECTIONS:
                 return "MAKE "
-                        + Math.max(0,
-                        objectiveTarget - connectionsThisLevel)
+                        + Math.max(
+                        0,
+                        objectiveTarget - connectionsThisLevel
+                )
                         + " CONNECTIONS";
 
             case OBJECTIVE_LONG:
@@ -409,6 +412,7 @@ public class GameView extends View {
     }
 
     private String getObjectiveShortValue() {
+
         switch (objectiveType) {
 
             case OBJECTIVE_CANDIES:
@@ -436,14 +440,375 @@ public class GameView extends View {
         }
     }
 
+    /*
+     * ============================================================
+     * GUARANTEED PLAYABLE BOARD SYSTEM
+     * ============================================================
+     *
+     * Every fresh board receives at least one guaranteed path.
+     *
+     * For LONG and MIXED objectives the guaranteed path is at least
+     * five candies long.
+     *
+     * For normal connections it is at least minimumConnection long.
+     *
+     * This prevents the game from giving the player an objective
+     * while the board has no valid connection available.
+     */
+
     private void createBoard() {
+
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
                 board[row][col] =
                         random.nextInt(CANDY_TYPES);
             }
         }
+
+        ensureGuaranteedPlayablePath();
     }
+
+    private int getGuaranteedPathLength() {
+
+        int required = minimumConnection;
+
+        if (objectiveType == OBJECTIVE_LONG
+                || objectiveType == OBJECTIVE_MIXED) {
+
+            required = Math.max(
+                    required,
+                    5
+            );
+        }
+
+        /*
+         * A 7x7 board can safely contain a long winding path.
+         * Cap the guaranteed path so it remains achievable without
+         * forcing the whole board to become one candy type.
+         */
+        required = Math.min(required, 12);
+
+        return required;
+    }
+
+    private void ensureGuaranteedPlayablePath() {
+
+        int required = getGuaranteedPathLength();
+
+        /*
+         * First check whether the randomly generated board already
+         * contains a valid path.
+         */
+        if (hasValidConnection(required)) {
+            return;
+        }
+
+        /*
+         * Try several random path constructions.
+         */
+        for (int attempt = 0; attempt < 100; attempt++) {
+
+            int candyType =
+                    random.nextInt(CANDY_TYPES);
+
+            List<int[]> path =
+                    buildRandomPath(required);
+
+            if (path.size() >= required) {
+
+                for (int[] cell : path) {
+
+                    board[cell[0]][cell[1]] =
+                            candyType;
+                }
+
+                if (hasValidConnection(required)) {
+                    return;
+                }
+            }
+        }
+
+        /*
+         * Final deterministic fallback.
+         */
+        createGuaranteedSnake(required);
+    }
+
+    private List<int[]> buildRandomPath(int required) {
+
+        List<int[]> path =
+                new ArrayList<>();
+
+        boolean[][] used =
+                new boolean[ROWS][COLS];
+
+        int startRow =
+                random.nextInt(ROWS);
+
+        int startCol =
+                random.nextInt(COLS);
+
+        path.add(
+                new int[]{
+                        startRow,
+                        startCol
+                }
+        );
+
+        used[startRow][startCol] = true;
+
+        int[][] directions = {
+
+                {-1, -1},
+                {-1, 0},
+                {-1, 1},
+
+                {0, -1},
+                {0, 1},
+
+                {1, -1},
+                {1, 0},
+                {1, 1}
+        };
+
+        for (int step = 1;
+             step < required;
+             step++) {
+
+            int[] last =
+                    path.get(
+                            path.size() - 1
+                    );
+
+            List<int[]> possible =
+                    new ArrayList<>();
+
+            for (int[] direction : directions) {
+
+                int nr =
+                        last[0]
+                                + direction[0];
+
+                int nc =
+                        last[1]
+                                + direction[1];
+
+                if (nr < 0
+                        || nr >= ROWS
+                        || nc < 0
+                        || nc >= COLS) {
+                    continue;
+                }
+
+                if (used[nr][nc]) {
+                    continue;
+                }
+
+                possible.add(
+                        new int[]{
+                                nr,
+                                nc
+                        }
+                );
+            }
+
+            if (possible.isEmpty()) {
+                break;
+            }
+
+            Collections.shuffle(
+                    possible,
+                    random
+            );
+
+            int[] next =
+                    possible.get(0);
+
+            path.add(next);
+
+            used[next[0]][next[1]] = true;
+        }
+
+        return path;
+    }
+
+    private void createGuaranteedSnake(int required) {
+
+        int candyType =
+                random.nextInt(CANDY_TYPES);
+
+        List<int[]> path =
+                new ArrayList<>();
+
+        /*
+         * A winding staircase-style route.
+         */
+        for (int row = 0;
+             row < ROWS && path.size() < required;
+             row++) {
+
+            if (row % 2 == 0) {
+
+                for (int col = 0;
+                     col < COLS
+                             && path.size() < required;
+                     col++) {
+
+                    path.add(
+                            new int[]{
+                                    row,
+                                    col
+                            }
+                    );
+                }
+
+            } else {
+
+                for (int col = COLS - 1;
+                     col >= 0
+                             && path.size() < required;
+                     col--) {
+
+                    path.add(
+                            new int[]{
+                                    row,
+                                    col
+                            }
+                    );
+                }
+            }
+        }
+
+        for (int[] cell : path) {
+
+            board[cell[0]][cell[1]] =
+                    candyType;
+        }
+    }
+
+    private boolean hasValidConnection(int required) {
+
+        if (required <= 1) {
+            return true;
+        }
+
+        boolean[][] visited =
+                new boolean[ROWS][COLS];
+
+        for (int row = 0; row < ROWS; row++) {
+
+            for (int col = 0; col < COLS; col++) {
+
+                int type =
+                        board[row][col];
+
+                if (type < 0) {
+                    continue;
+                }
+
+                for (int nextRow = 0;
+                     nextRow < ROWS;
+                     nextRow++) {
+
+                    for (int nextCol = 0;
+                         nextCol < COLS;
+                         nextCol++) {
+
+                        visited[nextRow][nextCol] =
+                                false;
+                    }
+                }
+
+                if (findPathLength(
+                        row,
+                        col,
+                        type,
+                        1,
+                        required,
+                        visited
+                )) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean findPathLength(
+            int row,
+            int col,
+            int type,
+            int length,
+            int required,
+            boolean[][] visited
+    ) {
+
+        if (length >= required) {
+            return true;
+        }
+
+        visited[row][col] = true;
+
+        int[][] directions = {
+
+                {-1, -1},
+                {-1, 0},
+                {-1, 1},
+
+                {0, -1},
+                {0, 1},
+
+                {1, -1},
+                {1, 0},
+                {1, 1}
+        };
+
+        for (int[] direction : directions) {
+
+            int nr =
+                    row + direction[0];
+
+            int nc =
+                    col + direction[1];
+
+            if (nr < 0
+                    || nr >= ROWS
+                    || nc < 0
+                    || nc >= COLS) {
+                continue;
+            }
+
+            if (visited[nr][nc]) {
+                continue;
+            }
+
+            if (board[nr][nc] != type) {
+                continue;
+            }
+
+            if (findPathLength(
+                    nr,
+                    nc,
+                    type,
+                    length + 1,
+                    required,
+                    visited
+            )) {
+                return true;
+            }
+        }
+
+        visited[row][col] = false;
+
+        return false;
+    }
+
+    /*
+     * ============================================================
+     * DRAWING
+     * ============================================================
+     */
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -463,23 +828,28 @@ public class GameView extends View {
 
         drawHud(canvas, scale);
 
-        /*
-         * Large board area.
-         */
-        float hudBottom = 177f * scale;
-        float objectiveHeight = 66f * scale;
+        float hudBottom =
+                177f * scale;
+
+        float objectiveHeight =
+                66f * scale;
 
         float boardAreaTop =
-                hudBottom + 7f * scale;
+                hudBottom
+                        + 7f * scale;
 
         float boardAreaBottom =
-                height - objectiveHeight - 8f * scale;
+                height
+                        - objectiveHeight
+                        - 8f * scale;
 
         float availableWidth =
-                width - 14f * scale;
+                width
+                        - 14f * scale;
 
         float availableHeight =
-                boardAreaBottom - boardAreaTop;
+                boardAreaBottom
+                        - boardAreaTop;
 
         cellSize =
                 Math.min(
@@ -498,13 +868,15 @@ public class GameView extends View {
                 cellSize * ROWS;
 
         boardLeft =
-                (width - boardWidth) / 2f;
+                (width - boardWidth)
+                        / 2f;
 
         boardTop =
                 boardAreaTop
                         + Math.max(
                         0f,
-                        (availableHeight - boardHeight) / 2f
+                        (availableHeight - boardHeight)
+                                / 2f
                 );
 
         drawBoardBackground(
@@ -534,7 +906,9 @@ public class GameView extends View {
         drawObjectivePanel(
                 canvas,
                 scale,
-                height - objectiveHeight - 4f * scale,
+                height
+                        - objectiveHeight
+                        - 4f * scale,
                 height - 4f * scale
         );
     }
@@ -545,8 +919,13 @@ public class GameView extends View {
         float height = getHeight();
 
         paint.setStyle(Paint.Style.FILL);
+
         paint.setColor(
-                Color.rgb(255, 239, 248)
+                Color.rgb(
+                        255,
+                        239,
+                        248
+                )
         );
 
         canvas.drawRect(
@@ -557,15 +936,17 @@ public class GameView extends View {
                 paint
         );
 
-        /*
-         * Soft candy bubbles around the play area.
-         */
         drawBackgroundBubble(
                 canvas,
                 width * .07f,
                 height * .19f,
                 32f,
-                Color.argb(35, 255, 80, 150)
+                Color.argb(
+                        35,
+                        255,
+                        80,
+                        150
+                )
         );
 
         drawBackgroundBubble(
@@ -573,7 +954,12 @@ public class GameView extends View {
                 width * .93f,
                 height * .20f,
                 38f,
-                Color.argb(35, 120, 70, 220)
+                Color.argb(
+                        35,
+                        120,
+                        70,
+                        220
+                )
         );
 
         drawBackgroundBubble(
@@ -581,7 +967,12 @@ public class GameView extends View {
                 width * .06f,
                 height * .76f,
                 36f,
-                Color.argb(32, 70, 170, 245)
+                Color.argb(
+                        32,
+                        70,
+                        170,
+                        245
+                )
         );
 
         drawBackgroundBubble(
@@ -589,11 +980,21 @@ public class GameView extends View {
                 width * .94f,
                 height * .77f,
                 38f,
-                Color.argb(35, 255, 165, 70)
+                Color.argb(
+                        35,
+                        255,
+                        165,
+                        70
+                )
         );
 
         paint.setColor(
-                Color.argb(75, 255, 130, 180)
+                Color.argb(
+                        75,
+                        255,
+                        130,
+                        180
+                )
         );
 
         drawSparkle(
@@ -644,7 +1045,12 @@ public class GameView extends View {
         );
 
         paint.setColor(
-                Color.argb(50, 255, 255, 255)
+                Color.argb(
+                        50,
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawCircle(
@@ -664,17 +1070,52 @@ public class GameView extends View {
 
         Path p = new Path();
 
-        p.moveTo(cx, cy - size);
-        p.lineTo(cx + size * .25f, cy - size * .25f);
-        p.lineTo(cx + size, cy);
-        p.lineTo(cx + size * .25f, cy + size * .25f);
-        p.lineTo(cx, cy + size);
-        p.lineTo(cx - size * .25f, cy + size * .25f);
-        p.lineTo(cx - size, cy);
-        p.lineTo(cx - size * .25f, cy - size * .25f);
+        p.moveTo(
+                cx,
+                cy - size
+        );
+
+        p.lineTo(
+                cx + size * .25f,
+                cy - size * .25f
+        );
+
+        p.lineTo(
+                cx + size,
+                cy
+        );
+
+        p.lineTo(
+                cx + size * .25f,
+                cy + size * .25f
+        );
+
+        p.lineTo(
+                cx,
+                cy + size
+        );
+
+        p.lineTo(
+                cx - size * .25f,
+                cy + size * .25f
+        );
+
+        p.lineTo(
+                cx - size,
+                cy
+        );
+
+        p.lineTo(
+                cx - size * .25f,
+                cy - size * .25f
+        );
+
         p.close();
 
-        canvas.drawPath(p, paint);
+        canvas.drawPath(
+                p,
+                paint
+        );
     }
 
     private void drawHud(
@@ -691,14 +1132,20 @@ public class GameView extends View {
                 )
         );
 
-        hudPaint.setTextAlign(Paint.Align.CENTER);
+        hudPaint.setTextAlign(
+                Paint.Align.CENTER
+        );
 
-        /*
-         * Title.
-         */
-        hudPaint.setTextSize(25f * scale);
+        hudPaint.setTextSize(
+                25f * scale
+        );
+
         hudPaint.setColor(
-                Color.rgb(125, 45, 95)
+                Color.rgb(
+                        125,
+                        45,
+                        95
+                )
         );
 
         canvas.drawText(
@@ -708,17 +1155,16 @@ public class GameView extends View {
                 hudPaint
         );
 
-        /*
-         * Level pill.
-         */
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.WHITE);
 
         canvas.drawRoundRect(
                 new RectF(
-                        width / 2f - 55f * scale,
+                        width / 2f
+                                - 55f * scale,
                         37f * scale,
-                        width / 2f + 55f * scale,
+                        width / 2f
+                                + 55f * scale,
                         66f * scale
                 ),
                 15f * scale,
@@ -726,9 +1172,16 @@ public class GameView extends View {
                 paint
         );
 
-        hudPaint.setTextSize(14f * scale);
+        hudPaint.setTextSize(
+                14f * scale
+        );
+
         hudPaint.setColor(
-                Color.rgb(110, 55, 90)
+                Color.rgb(
+                        110,
+                        55,
+                        90
+                )
         );
 
         canvas.drawText(
@@ -738,17 +1191,23 @@ public class GameView extends View {
                 hudPaint
         );
 
-        /*
-         * Three large readable cards.
-         */
-        float margin = 8f * scale;
-        float gap = 6f * scale;
+        float margin =
+                8f * scale;
+
+        float gap =
+                6f * scale;
 
         float cardWidth =
-                (width - margin * 2f - gap * 2f) / 3f;
+                (width
+                        - margin * 2f
+                        - gap * 2f)
+                        / 3f;
 
-        float top = 73f * scale;
-        float bottom = 161f * scale;
+        float top =
+                73f * scale;
+
+        float bottom =
+                161f * scale;
 
         drawHudBox(
                 canvas,
@@ -765,7 +1224,9 @@ public class GameView extends View {
                 canvas,
                 margin + cardWidth + gap,
                 top,
-                margin + cardWidth * 2f + gap,
+                margin
+                        + cardWidth * 2f
+                        + gap,
                 bottom,
                 "GOAL",
                 getObjectiveShortValue(),
@@ -774,7 +1235,9 @@ public class GameView extends View {
 
         drawHudBox(
                 canvas,
-                margin + cardWidth * 2f + gap * 2f,
+                margin
+                        + cardWidth * 2f
+                        + gap * 2f,
                 top,
                 width - margin,
                 bottom,
@@ -796,7 +1259,12 @@ public class GameView extends View {
     ) {
 
         shadowPaint.setColor(
-                Color.argb(40, 80, 45, 80)
+                Color.argb(
+                        40,
+                        80,
+                        45,
+                        80
+                )
         );
 
         canvas.drawRoundRect(
@@ -827,9 +1295,16 @@ public class GameView extends View {
         );
 
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(2f * scale);
+        paint.setStrokeWidth(
+                2f * scale
+        );
+
         paint.setColor(
-                Color.rgb(246, 205, 225)
+                Color.rgb(
+                        246,
+                        205,
+                        225
+                )
         );
 
         canvas.drawRoundRect(
@@ -846,14 +1321,24 @@ public class GameView extends View {
 
         paint.setStyle(Paint.Style.FILL);
 
-        hudPaint.setTextAlign(Paint.Align.CENTER);
+        hudPaint.setTextAlign(
+                Paint.Align.CENTER
+        );
+
         hudPaint.setTypeface(
                 android.graphics.Typeface.DEFAULT_BOLD
         );
 
-        hudPaint.setTextSize(11f * scale);
+        hudPaint.setTextSize(
+                11f * scale
+        );
+
         hudPaint.setColor(
-                Color.rgb(145, 105, 130)
+                Color.rgb(
+                        145,
+                        105,
+                        130
+                )
         );
 
         canvas.drawText(
@@ -863,9 +1348,16 @@ public class GameView extends View {
                 hudPaint
         );
 
-        hudPaint.setTextSize(24f * scale);
+        hudPaint.setTextSize(
+                24f * scale
+        );
+
         hudPaint.setColor(
-                Color.rgb(75, 35, 70)
+                Color.rgb(
+                        75,
+                        35,
+                        70
+                )
         );
 
         canvas.drawText(
@@ -884,11 +1376,13 @@ public class GameView extends View {
             float height
     ) {
 
-        /*
-         * Premium shadow.
-         */
         shadowPaint.setColor(
-                Color.argb(55, 75, 40, 70)
+                Color.argb(
+                        55,
+                        75,
+                        40,
+                        70
+                )
         );
 
         canvas.drawRoundRect(
@@ -903,12 +1397,13 @@ public class GameView extends View {
                 shadowPaint
         );
 
-        /*
-         * Board.
-         */
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(
-                Color.rgb(255, 255, 255)
+                Color.rgb(
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawRoundRect(
@@ -923,16 +1418,20 @@ public class GameView extends View {
                 paint
         );
 
-        /*
-         * Very soft inner grid.
-         */
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(1f);
+
         paint.setColor(
-                Color.rgb(248, 225, 238)
+                Color.rgb(
+                        248,
+                        225,
+                        238
+                )
         );
 
-        for (int i = 1; i < COLS; i++) {
+        for (int i = 1;
+             i < COLS;
+             i++) {
 
             float x =
                     left + i * cellSize;
@@ -946,7 +1445,9 @@ public class GameView extends View {
             );
         }
 
-        for (int i = 1; i < ROWS; i++) {
+        for (int i = 1;
+             i < ROWS;
+             i++) {
 
             float y =
                     top + i * cellSize;
@@ -965,9 +1466,13 @@ public class GameView extends View {
 
     private void drawBoard(Canvas canvas) {
 
-        for (int row = 0; row < ROWS; row++) {
+        for (int row = 0;
+             row < ROWS;
+             row++) {
 
-            for (int col = 0; col < COLS; col++) {
+            for (int col = 0;
+                 col < COLS;
+                 col++) {
 
                 if (board[row][col] < 0) {
                     continue;
@@ -983,9 +1488,6 @@ public class GameView extends View {
         }
     }
 
-    /*
-     * Ten candy/fruit styles.
-     */
     private void drawCandy(
             Canvas canvas,
             int row,
@@ -993,10 +1495,14 @@ public class GameView extends View {
             int type
     ) {
 
-        float cx = getCellCenterX(col);
-        float cy = getCellCenterY(row);
+        float cx =
+                getCellCenterX(col);
 
-        float size = cellSize * .34f;
+        float cy =
+                getCellCenterY(row);
+
+        float size =
+                cellSize * .34f;
 
         float scale = 1f;
 
@@ -1007,19 +1513,25 @@ public class GameView extends View {
                             - popStartTime;
 
             float progress =
-                    Math.min(1f, elapsed / 260f);
+                    Math.min(
+                            1f,
+                            elapsed / 260f
+                    );
 
             scale =
-                    1f - progress * .9f;
+                    1f
+                            - progress * .9f;
         }
 
         size *= scale;
 
-        /*
-         * Candy shadow.
-         */
         shadowPaint.setColor(
-                Color.argb(48, 70, 40, 65)
+                Color.argb(
+                        48,
+                        70,
+                        40,
+                        65
+                )
         );
 
         canvas.drawCircle(
@@ -1031,13 +1543,14 @@ public class GameView extends View {
 
         paint.setStyle(Paint.Style.FILL);
 
-        /*
-         * 0 = watermelon
-         */
         if (type == 0) {
 
             paint.setColor(
-                    Color.rgb(55, 175, 85)
+                    Color.rgb(
+                            55,
+                            175,
+                            85
+                    )
             );
 
             canvas.drawCircle(
@@ -1048,7 +1561,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(240, 75, 85)
+                    Color.rgb(
+                            240,
+                            75,
+                            85
+                    )
             );
 
             canvas.drawCircle(
@@ -1090,18 +1607,22 @@ public class GameView extends View {
                     paint
             );
 
-        /*
-         * 1 = strawberry
-         */
         } else if (type == 1) {
 
             paint.setColor(
-                    Color.rgb(235, 45, 65)
+                    Color.rgb(
+                            235,
+                            45,
+                            65
+                    )
             );
 
             Path p = new Path();
 
-            p.moveTo(cx, cy + size);
+            p.moveTo(
+                    cx,
+                    cy + size
+            );
 
             p.cubicTo(
                     cx - size * 1.05f,
@@ -1121,10 +1642,17 @@ public class GameView extends View {
                     cy + size
             );
 
-            canvas.drawPath(p, paint);
+            canvas.drawPath(
+                    p,
+                    paint
+            );
 
             paint.setColor(
-                    Color.rgb(45, 170, 70)
+                    Color.rgb(
+                            45,
+                            170,
+                            70
+                    )
             );
 
             Path leaves = new Path();
@@ -1161,33 +1689,44 @@ public class GameView extends View {
 
             leaves.close();
 
-            canvas.drawPath(leaves, paint);
+            canvas.drawPath(
+                    leaves,
+                    paint
+            );
 
             paint.setColor(Color.WHITE);
 
-            for (int i = -1; i <= 1; i++) {
+            for (int i = -1;
+                 i <= 1;
+                 i++) {
 
                 canvas.drawOval(
                         new RectF(
-                                cx + i * size * .28f - 2f,
+                                cx
+                                        + i * size * .28f
+                                        - 2f,
                                 cy - size * .10f,
-                                cx + i * size * .28f + 2f,
+                                cx
+                                        + i * size * .28f
+                                        + 2f,
                                 cy + size * .10f
                         ),
                         paint
                 );
             }
 
-        /*
-         * 2 = grapes
-         */
         } else if (type == 2) {
 
             paint.setColor(
-                    Color.rgb(125, 65, 190)
+                    Color.rgb(
+                            125,
+                            65,
+                            190
+                    )
             );
 
-            float r = size * .34f;
+            float r =
+                    size * .34f;
 
             canvas.drawCircle(
                     cx,
@@ -1246,7 +1785,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(55, 150, 65)
+                    Color.rgb(
+                            55,
+                            150,
+                            65
+                    )
             );
 
             canvas.drawOval(
@@ -1259,13 +1802,14 @@ public class GameView extends View {
                     paint
             );
 
-        /*
-         * 3 = wrapped candy
-         */
         } else if (type == 3) {
 
             paint.setColor(
-                    Color.rgb(65, 160, 240)
+                    Color.rgb(
+                            65,
+                            160,
+                            240
+                    )
             );
 
             canvas.drawRoundRect(
@@ -1309,7 +1853,10 @@ public class GameView extends View {
 
             left.close();
 
-            canvas.drawPath(left, paint);
+            canvas.drawPath(
+                    left,
+                    paint
+            );
 
             Path right = new Path();
 
@@ -1340,7 +1887,10 @@ public class GameView extends View {
 
             right.close();
 
-            canvas.drawPath(right, paint);
+            canvas.drawPath(
+                    right,
+                    paint
+            );
 
             paint.setColor(Color.WHITE);
 
@@ -1351,13 +1901,14 @@ public class GameView extends View {
                     paint
             );
 
-        /*
-         * 4 = chocolate
-         */
         } else if (type == 4) {
 
             paint.setColor(
-                    Color.rgb(105, 55, 30)
+                    Color.rgb(
+                            105,
+                            55,
+                            30
+                    )
             );
 
             canvas.drawRoundRect(
@@ -1373,20 +1924,38 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(175, 105, 65)
+                    Color.rgb(
+                            175,
+                            105,
+                            65
+                    )
             );
 
-            float piece = size * .27f;
+            float piece =
+                    size * .27f;
 
-            for (int r = -1; r <= 1; r++) {
-                for (int c = -1; c <= 1; c++) {
+            for (int r = -1;
+                 r <= 1;
+                 r++) {
+
+                for (int c = -1;
+                     c <= 1;
+                     c++) {
 
                     canvas.drawRoundRect(
                             new RectF(
-                                    cx + c * piece * 1.8f - piece,
-                                    cy + r * piece * 1.7f - piece,
-                                    cx + c * piece * 1.8f + piece,
-                                    cy + r * piece * 1.7f + piece
+                                    cx
+                                            + c * piece * 1.8f
+                                            - piece,
+                                    cy
+                                            + r * piece * 1.7f
+                                            - piece,
+                                    cx
+                                            + c * piece * 1.8f
+                                            + piece,
+                                    cy
+                                            + r * piece * 1.7f
+                                            + piece
                             ),
                             4f,
                             4f,
@@ -1395,13 +1964,12 @@ public class GameView extends View {
                 }
             }
 
-        /*
-         * 5 = lollipop
-         */
         } else if (type == 5) {
 
             paint.setColor(Color.WHITE);
-            paint.setStrokeWidth(size * .14f);
+            paint.setStrokeWidth(
+                    size * .14f
+            );
 
             canvas.drawLine(
                     cx,
@@ -1412,7 +1980,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(245, 75, 160)
+                    Color.rgb(
+                            245,
+                            75,
+                            160
+                    )
             );
 
             canvas.drawCircle(
@@ -1422,8 +1994,14 @@ public class GameView extends View {
                     paint
             );
 
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(size * .12f);
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
+            paint.setStrokeWidth(
+                    size * .12f
+            );
+
             paint.setColor(Color.WHITE);
 
             canvas.drawCircle(
@@ -1433,18 +2011,23 @@ public class GameView extends View {
                     paint
             );
 
-            paint.setStyle(Paint.Style.FILL);
+            paint.setStyle(
+                    Paint.Style.FILL
+            );
 
-        /*
-         * 6 = dango
-         */
         } else if (type == 6) {
 
             paint.setColor(
-                    Color.rgb(135, 80, 45)
+                    Color.rgb(
+                            135,
+                            80,
+                            45
+                    )
             );
 
-            paint.setStrokeWidth(size * .10f);
+            paint.setStrokeWidth(
+                    size * .10f
+            );
 
             canvas.drawLine(
                     cx,
@@ -1455,7 +2038,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(255, 125, 160)
+                    Color.rgb(
+                            255,
+                            125,
+                            160
+                    )
             );
 
             canvas.drawCircle(
@@ -1466,7 +2053,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(255, 230, 185)
+                    Color.rgb(
+                            255,
+                            230,
+                            185
+                    )
             );
 
             canvas.drawCircle(
@@ -1477,7 +2068,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(105, 190, 105)
+                    Color.rgb(
+                            105,
+                            190,
+                            105
+                    )
             );
 
             canvas.drawCircle(
@@ -1487,9 +2082,6 @@ public class GameView extends View {
                     paint
             );
 
-        /*
-         * 7 = red apple
-         */
         } else if (type == 7) {
 
             drawApple(
@@ -1497,19 +2089,26 @@ public class GameView extends View {
                     cx,
                     cy,
                     size,
-                    Color.rgb(220, 45, 50)
+                    Color.rgb(
+                            220,
+                            45,
+                            50
+                    )
             );
 
-        /*
-         * 8 = cherries
-         */
         } else if (type == 8) {
 
             paint.setColor(
-                    Color.rgb(60, 145, 65)
+                    Color.rgb(
+                            60,
+                            145,
+                            65
+                    )
             );
 
-            paint.setStrokeWidth(size * .08f);
+            paint.setStrokeWidth(
+                    size * .08f
+            );
 
             canvas.drawLine(
                     cx - size * .20f,
@@ -1528,7 +2127,11 @@ public class GameView extends View {
             );
 
             paint.setColor(
-                    Color.rgb(195, 35, 55)
+                    Color.rgb(
+                            195,
+                            35,
+                            55
+                    )
             );
 
             canvas.drawCircle(
@@ -1545,9 +2148,6 @@ public class GameView extends View {
                     paint
             );
 
-        /*
-         * 9 = green apple
-         */
         } else {
 
             drawApple(
@@ -1555,16 +2155,25 @@ public class GameView extends View {
                     cx,
                     cy,
                     size,
-                    Color.rgb(90, 190, 75)
+                    Color.rgb(
+                            90,
+                            190,
+                            75
+                    )
             );
         }
 
-        /*
-         * Glossy highlight.
-         */
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(
+                Paint.Style.FILL
+        );
+
         paint.setColor(
-                Color.argb(125, 255, 255, 255)
+                Color.argb(
+                        125,
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawCircle(
@@ -1574,13 +2183,19 @@ public class GameView extends View {
                 paint
         );
 
-        /*
-         * Candy outline.
-         */
-        outlinePaint.setStyle(Paint.Style.STROKE);
+        outlinePaint.setStyle(
+                Paint.Style.STROKE
+        );
+
         outlinePaint.setStrokeWidth(2f);
+
         outlinePaint.setColor(
-                Color.argb(100, 255, 255, 255)
+                Color.argb(
+                        100,
+                        255,
+                        255,
+                        255
+                )
         );
 
         canvas.drawCircle(
@@ -1599,7 +2214,10 @@ public class GameView extends View {
             int color
     ) {
 
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(
+                Paint.Style.FILL
+        );
+
         paint.setColor(color);
 
         Path apple = new Path();
@@ -1627,10 +2245,17 @@ public class GameView extends View {
                 cy + size * .95f
         );
 
-        canvas.drawPath(apple, paint);
+        canvas.drawPath(
+                apple,
+                paint
+        );
 
         paint.setColor(
-                Color.rgb(75, 125, 45)
+                Color.rgb(
+                        75,
+                        125,
+                        45
+                )
         );
 
         canvas.drawRect(
@@ -1642,7 +2267,11 @@ public class GameView extends View {
         );
 
         paint.setColor(
-                Color.rgb(55, 155, 65)
+                Color.rgb(
+                        55,
+                        155,
+                        65
+                )
         );
 
         canvas.drawOval(
@@ -1673,7 +2302,9 @@ public class GameView extends View {
         return false;
     }
 
-    private void drawConnectionPath(Canvas canvas) {
+    private void drawConnectionPath(
+            Canvas canvas
+    ) {
 
         if (selected.size() < 2) {
             return;
@@ -1681,16 +2312,20 @@ public class GameView extends View {
 
         connectionPath.reset();
 
-        int[] first = selected.get(0);
+        int[] first =
+                selected.get(0);
 
         connectionPath.moveTo(
                 getCellCenterX(first[1]),
                 getCellCenterY(first[0])
         );
 
-        for (int i = 1; i < selected.size(); i++) {
+        for (int i = 1;
+             i < selected.size();
+             i++) {
 
-            int[] cell = selected.get(i);
+            int[] cell =
+                    selected.get(i);
 
             connectionPath.lineTo(
                     getCellCenterX(cell[1]),
@@ -1699,7 +2334,9 @@ public class GameView extends View {
         }
 
         int color =
-                getCandyColor(connectionCandyType);
+                getCandyColor(
+                        connectionCandyType
+                );
 
         lineGlowPaint.setColor(
                 Color.argb(
@@ -1711,7 +2348,10 @@ public class GameView extends View {
         );
 
         lineGlowPaint.setStrokeWidth(
-                Math.max(20f, cellSize * .32f)
+                Math.max(
+                        20f,
+                        cellSize * .32f
+                )
         );
 
         canvas.drawPath(
@@ -1722,7 +2362,10 @@ public class GameView extends View {
         linePaint.setColor(color);
 
         linePaint.setStrokeWidth(
-                Math.max(9f, cellSize * .16f)
+                Math.max(
+                        9f,
+                        cellSize * .16f
+                )
         );
 
         canvas.drawPath(
@@ -1730,15 +2373,20 @@ public class GameView extends View {
                 linePaint
         );
 
-        /*
-         * White highlight through the connection.
-         */
         linePaint.setColor(
-                Color.argb(110, 255, 255, 255)
+                Color.argb(
+                        110,
+                        255,
+                        255,
+                        255
+                )
         );
 
         linePaint.setStrokeWidth(
-                Math.max(2f, cellSize * .035f)
+                Math.max(
+                        2f,
+                        cellSize * .035f
+                )
         );
 
         canvas.drawPath(
@@ -1747,14 +2395,18 @@ public class GameView extends View {
         );
     }
 
-    private void drawFingerPreview(Canvas canvas) {
+    private void drawFingerPreview(
+            Canvas canvas
+    ) {
 
         if (selected.isEmpty()) {
             return;
         }
 
         int[] last =
-                selected.get(selected.size() - 1);
+                selected.get(
+                        selected.size() - 1
+                );
 
         int[] fingerCell =
                 getCell(
@@ -1766,7 +2418,10 @@ public class GameView extends View {
             return;
         }
 
-        if (!isAdjacent(last, fingerCell)) {
+        if (!isAdjacent(
+                last,
+                fingerCell
+        )) {
             return;
         }
 
@@ -1776,7 +2431,9 @@ public class GameView extends View {
         }
 
         int color =
-                getCandyColor(connectionCandyType);
+                getCandyColor(
+                        connectionCandyType
+                );
 
         linePaint.setColor(
                 Color.argb(
@@ -1788,7 +2445,10 @@ public class GameView extends View {
         );
 
         linePaint.setStrokeWidth(
-                Math.max(6f, cellSize * .10f)
+                Math.max(
+                        6f,
+                        cellSize * .10f
+                )
         );
 
         canvas.drawLine(
@@ -1800,15 +2460,21 @@ public class GameView extends View {
         );
     }
 
-    private void drawSelection(Canvas canvas) {
+    private void drawSelection(
+            Canvas canvas
+    ) {
 
         for (int[] cell : selected) {
 
             float cx =
-                    getCellCenterX(cell[1]);
+                    getCellCenterX(
+                            cell[1]
+                    );
 
             float cy =
-                    getCellCenterY(cell[0]);
+                    getCellCenterY(
+                            cell[0]
+                    );
 
             float radius =
                     cellSize * .40f;
@@ -1823,7 +2489,10 @@ public class GameView extends View {
             );
 
             effectPaint.setStrokeWidth(
-                    Math.max(4f, cellSize * .045f)
+                    Math.max(
+                            4f,
+                            cellSize * .045f
+                    )
             );
 
             effectPaint.setColor(
@@ -1879,13 +2548,18 @@ public class GameView extends View {
         );
 
         hudPaint.setColor(
-                Color.rgb(225, 70, 125)
+                Color.rgb(
+                        225,
+                        70,
+                        125
+                )
         );
 
         canvas.drawText(
                 "🔥 COMBO x" + combo,
                 getWidth() / 2f,
-                getHeight() - 76f * scale,
+                getHeight()
+                        - 76f * scale,
                 hudPaint
         );
     }
@@ -1897,13 +2571,22 @@ public class GameView extends View {
             float bottom
     ) {
 
-        float width = getWidth();
+        float width =
+                getWidth();
 
-        float left = 10f * scale;
-        float right = width - 10f * scale;
+        float left =
+                10f * scale;
+
+        float right =
+                width - 10f * scale;
 
         shadowPaint.setColor(
-                Color.argb(45, 80, 40, 75)
+                Color.argb(
+                        45,
+                        80,
+                        40,
+                        75
+                )
         );
 
         canvas.drawRoundRect(
@@ -1918,7 +2601,10 @@ public class GameView extends View {
                 shadowPaint
         );
 
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(
+                Paint.Style.FILL
+        );
+
         paint.setColor(Color.WHITE);
 
         canvas.drawRoundRect(
@@ -1933,10 +2619,20 @@ public class GameView extends View {
                 paint
         );
 
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(2f * scale);
+        paint.setStyle(
+                Paint.Style.STROKE
+        );
+
+        paint.setStrokeWidth(
+                2f * scale
+        );
+
         paint.setColor(
-                Color.rgb(245, 205, 225)
+                Color.rgb(
+                        245,
+                        205,
+                        225
+                )
         );
 
         canvas.drawRoundRect(
@@ -1951,7 +2647,9 @@ public class GameView extends View {
                 paint
         );
 
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(
+                Paint.Style.FILL
+        );
 
         hudPaint.setTypeface(
                 android.graphics.Typeface.create(
@@ -1960,14 +2658,20 @@ public class GameView extends View {
                 )
         );
 
-        hudPaint.setTextAlign(Paint.Align.CENTER);
+        hudPaint.setTextAlign(
+                Paint.Align.CENTER
+        );
 
         hudPaint.setTextSize(
                 11f * scale
         );
 
         hudPaint.setColor(
-                Color.rgb(155, 105, 135)
+                Color.rgb(
+                        155,
+                        105,
+                        135
+                )
         );
 
         canvas.drawText(
@@ -1982,15 +2686,23 @@ public class GameView extends View {
         );
 
         hudPaint.setColor(
-                Color.rgb(90, 40, 80)
+                Color.rgb(
+                        90,
+                        40,
+                        80
+                )
         );
 
         String objective =
                 getObjectiveText();
 
         if (objective.length() > 40) {
+
             objective =
-                    objective.substring(0, 40)
+                    objective.substring(
+                            0,
+                            40
+                    )
                             + "...";
         }
 
@@ -2002,6 +2714,12 @@ public class GameView extends View {
         );
     }
 
+    /*
+     * ============================================================
+     * TOUCH / CONNECTION SYSTEM
+     * ============================================================
+     */
+
     @Override
     public boolean onTouchEvent(
             MotionEvent event
@@ -2011,21 +2729,28 @@ public class GameView extends View {
             return true;
         }
 
-        float x = event.getX();
-        float y = event.getY();
+        float x =
+                event.getX();
+
+        float y =
+                event.getY();
 
         switch (event.getActionMasked()) {
 
             case MotionEvent.ACTION_DOWN:
 
                 int[] startCell =
-                        getCell(x, y);
+                        getCell(
+                                x,
+                                y
+                        );
 
                 if (startCell == null) {
                     return true;
                 }
 
-                if (board[startCell[0]][startCell[1]] < 0) {
+                if (board[startCell[0]][startCell[1]]
+                        < 0) {
                     return true;
                 }
 
@@ -2112,6 +2837,7 @@ public class GameView extends View {
             case MotionEvent.ACTION_CANCEL:
 
                 drawing = false;
+
                 selected.clear();
                 connectionPath.reset();
                 connectionCandyType = -1;
@@ -2131,12 +2857,16 @@ public class GameView extends View {
             float toY
     ) {
 
-        float dx = toX - fromX;
-        float dy = toY - fromY;
+        float dx =
+                toX - fromX;
+
+        float dy =
+                toY - fromY;
 
         float distance =
                 (float) Math.sqrt(
-                        dx * dx + dy * dy
+                        dx * dx
+                                + dy * dy
                 );
 
         float step =
@@ -2155,16 +2885,20 @@ public class GameView extends View {
 
         int[] previousSampleCell = null;
 
-        for (int i = 1; i <= samples; i++) {
+        for (int i = 1;
+             i <= samples;
+             i++) {
 
             float fraction =
                     i / (float) samples;
 
             float sampleX =
-                    fromX + dx * fraction;
+                    fromX
+                            + dx * fraction;
 
             float sampleY =
-                    fromY + dy * fraction;
+                    fromY
+                            + dy * fraction;
 
             int[] cell =
                     getCell(
@@ -2194,7 +2928,8 @@ public class GameView extends View {
             int[] cell
     ) {
 
-        if (cell == null || selected.isEmpty()) {
+        if (cell == null
+                || selected.isEmpty()) {
             return;
         }
 
@@ -2214,13 +2949,20 @@ public class GameView extends View {
                             selected.size() - 2
                     );
 
-            if (sameCell(previous, cell)) {
+            if (sameCell(
+                    previous,
+                    cell
+            )) {
+
                 backtrackOneCell();
                 return;
             }
         }
 
-        if (!isAdjacent(last, cell)) {
+        if (!isAdjacent(
+                last,
+                cell
+        )) {
             return;
         }
 
@@ -2236,7 +2978,9 @@ public class GameView extends View {
         tryAddCell(cell);
     }
 
-    private void tryAddCell(int[] cell) {
+    private void tryAddCell(
+            int[] cell
+    ) {
 
         if (cell == null) {
             return;
@@ -2266,13 +3010,16 @@ public class GameView extends View {
         );
 
         try {
+
             if (gameSound != null) {
                 gameSound.playPop();
             }
+
         } catch (Exception ignored) {
         }
 
         rebuildConnectionPath();
+
         invalidate();
     }
 
@@ -2287,6 +3034,7 @@ public class GameView extends View {
         );
 
         rebuildConnectionPath();
+
         invalidate();
     }
 
@@ -2320,18 +3068,6 @@ public class GameView extends View {
         }
     }
 
-    /*
-     * 8-DIRECTION CONNECTIONS.
-     *
-     * Horizontal
-     * Vertical
-     * Diagonal
-     * L
-     * U
-     * Zig-zag
-     * Staircase
-     * Winding paths
-     */
     private boolean isAdjacent(
             int[] a,
             int[] b
@@ -2342,22 +3078,29 @@ public class GameView extends View {
         }
 
         int rowDifference =
-                Math.abs(a[0] - b[0]);
+                Math.abs(
+                        a[0] - b[0]
+                );
 
         int colDifference =
-                Math.abs(a[1] - b[1]);
+                Math.abs(
+                        a[1] - b[1]
+                );
 
         return rowDifference <= 1
                 && colDifference <= 1
-                && (rowDifference != 0
-                || colDifference != 0);
+                && (
+                rowDifference != 0
+                        || colDifference != 0
+        );
     }
 
     private boolean alreadySelected(
             int[] cell
     ) {
 
-        for (int[] selectedCell : selected) {
+        for (int[] selectedCell :
+                selected) {
 
             if (sameCell(
                     selectedCell,
@@ -2392,13 +3135,17 @@ public class GameView extends View {
 
         int col =
                 (int)
-                        ((x - boardLeft)
-                                / cellSize);
+                        (
+                                (x - boardLeft)
+                                        / cellSize
+                        );
 
         int row =
                 (int)
-                        ((y - boardTop)
-                                / cellSize);
+                        (
+                                (y - boardTop)
+                                        / cellSize
+                        );
 
         if (row < 0
                 || row >= ROWS
@@ -2413,19 +3160,29 @@ public class GameView extends View {
         };
     }
 
-    private float getCellCenterX(int col) {
+    private float getCellCenterX(
+            int col
+    ) {
 
         return boardLeft
                 + col * cellSize
                 + cellSize / 2f;
     }
 
-    private float getCellCenterY(int row) {
+    private float getCellCenterY(
+            int row
+    ) {
 
         return boardTop
                 + row * cellSize
                 + cellSize / 2f;
     }
+
+    /*
+     * ============================================================
+     * POP / SCORE / REFILL
+     * ============================================================
+     */
 
     private void removeSelected() {
 
@@ -2449,9 +3206,6 @@ public class GameView extends View {
         int connectionLength =
                 selected.size();
 
-        /*
-         * UNLIMITED SCORE.
-         */
         int points =
                 connectionLength
                         * connectionLength;
@@ -2486,9 +3240,11 @@ public class GameView extends View {
         }
 
         try {
+
             if (gameSound != null) {
                 gameSound.playPop();
             }
+
         } catch (Exception ignored) {
         }
 
@@ -2498,7 +3254,9 @@ public class GameView extends View {
         animating = true;
 
         selected.clear();
+
         connectionPath.reset();
+
         connectionCandyType = -1;
 
         animationHandler.removeCallbacks(
@@ -2514,9 +3272,12 @@ public class GameView extends View {
 
     private void refillBoard() {
 
-        for (int col = 0; col < COLS; col++) {
+        for (int col = 0;
+             col < COLS;
+             col++) {
 
-            int writeRow = ROWS - 1;
+            int writeRow =
+                    ROWS - 1;
 
             for (int row = ROWS - 1;
                  row >= 0;
@@ -2541,7 +3302,20 @@ public class GameView extends View {
                 writeRow--;
             }
         }
+
+        /*
+         * IMPORTANT:
+         * After every refill we guarantee that the new board
+         * contains a playable connection.
+         */
+        ensureGuaranteedPlayablePath();
     }
+
+    /*
+     * ============================================================
+     * LEVEL COMPLETE / TIME UP
+     * ============================================================
+     */
 
     private void levelComplete() {
 
@@ -2569,7 +3343,8 @@ public class GameView extends View {
         } else {
 
             message =
-                    "Level " + level
+                    "Level "
+                            + level
                             + " complete!\n\n"
                             + "Score: "
                             + score
@@ -2725,9 +3500,11 @@ public class GameView extends View {
         );
 
         try {
+
             if (gameSound != null) {
                 gameSound.release();
             }
+
         } catch (Exception ignored) {
         }
 
