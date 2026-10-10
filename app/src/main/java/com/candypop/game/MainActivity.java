@@ -9,7 +9,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -30,6 +29,7 @@ public class MainActivity extends Activity {
 
     private LinearLayout root;
     private SharedPreferences preferences;
+    private SharedPreferences settings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,11 +49,15 @@ public class MainActivity extends Activity {
                 MODE_PRIVATE
         );
 
+        settings = getSharedPreferences(
+                "CandyPopSettings",
+                MODE_PRIVATE
+        );
+
         showHome();
     }
 
     private void showHome() {
-
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BACKGROUND);
@@ -76,46 +80,31 @@ public class MainActivity extends Activity {
     }
 
     private void addTopBar() {
-
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView brand = makeText(
-                "CANDY POP",
-                19,
-                DARK,
-                true
+                "CANDY POP", 19, DARK, true
         );
 
         bar.addView(
                 brand,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(44),
-                        1
-                )
+                new LinearLayout.LayoutParams(0, dp(44), 1)
         );
 
         TextView levels = makeText(
-                "★  100 LEVELS",
-                12,
-                PURPLE,
-                true
+                "★  100 LEVELS", 12, PURPLE, true
         );
 
         levels.setPadding(dp(12), 0, dp(12), 0);
         levels.setBackground(rounded(
-                Color.rgb(235, 224, 255),
-                24
+                Color.rgb(235, 224, 255), 24
         ));
 
         bar.addView(
                 levels,
-                new LinearLayout.LayoutParams(
-                        -2,
-                        dp(34)
-                )
+                new LinearLayout.LayoutParams(-2, dp(34))
         );
 
         root.addView(
@@ -125,7 +114,6 @@ public class MainActivity extends Activity {
     }
 
     private void addLogo() {
-
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
@@ -143,51 +131,26 @@ public class MainActivity extends Activity {
         gradient.setCornerRadius(dp(28));
         card.setBackground(gradient);
 
-        TextView welcome = makeText(
-                "WELCOME TO",
-                13,
-                PURPLE,
-                true
-        );
-
         card.addView(
-                welcome,
+                makeText("WELCOME TO", 13, PURPLE, true),
                 new LinearLayout.LayoutParams(-1, dp(27))
         );
 
-        TextView candy = makeText(
-                "CANDY",
-                45,
-                PINK,
-                true
-        );
-
         card.addView(
-                candy,
+                makeText("CANDY", 45, PINK, true),
                 new LinearLayout.LayoutParams(-1, dp(59))
         );
 
-        TextView pop = makeText(
-                "P O P !",
-                32,
-                PURPLE,
-                true
-        );
-
         card.addView(
-                pop,
+                makeText("P O P !", 32, PURPLE, true),
                 new LinearLayout.LayoutParams(-1, dp(45))
         );
 
-        TextView description = makeText(
-                "A SWEET WORLD OF FUN",
-                12,
-                DARK,
-                true
-        );
-
         card.addView(
-                description,
+                makeText(
+                        "A SWEET WORLD OF FUN",
+                        12, DARK, true
+                ),
                 new LinearLayout.LayoutParams(-1, dp(28))
         );
 
@@ -195,12 +158,10 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, -2);
 
         params.topMargin = dp(10);
-
         root.addView(card, params);
     }
 
     private void addCandyRow() {
-
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -215,7 +176,6 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, dp(52));
 
         params.topMargin = dp(5);
-
         root.addView(row, params);
     }
 
@@ -224,7 +184,6 @@ public class MainActivity extends Activity {
             String symbol,
             int color
     ) {
-
         TextView candy = makeText(symbol, 30, color, true);
 
         row.addView(
@@ -234,106 +193,74 @@ public class MainActivity extends Activity {
     }
 
     private void addTagline() {
-
-        TextView title = makeText(
-                "Small Game • Big Smiles",
-                20,
-                DARK,
-                true
-        );
-
         root.addView(
-                title,
+                makeText(
+                        "Small Game • Big Smiles",
+                        20, DARK, true
+                ),
                 new LinearLayout.LayoutParams(-1, dp(42))
         );
 
-        TextView subtitle = makeText(
-                "Connect candies. Make combos. Beat levels!",
-                13,
-                Color.rgb(126, 104, 145),
-                false
-        );
-
         root.addView(
-                subtitle,
+                makeText(
+                        "Connect candies. Make combos. Beat levels!",
+                        13, Color.rgb(126, 104, 145), false
+                ),
                 new LinearLayout.LayoutParams(-1, dp(30))
         );
     }
 
     private void addPlayButton() {
-
         Button play = makeButton(
-                "▶     PLAY NOW",
-                GREEN,
-                22
+                "▶     PLAY NOW", GREEN, 22
         );
 
         play.setElevation(dp(4));
-
         play.setOnClickListener(v -> startGame(1));
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, dp(72));
 
         params.topMargin = dp(12);
-
         root.addView(play, params);
     }
 
     private void addMenuButtons() {
-
-        Button levels = makeButton(
-                "★     LEVELS",
-                PURPLE,
-                17
-        );
-
+        Button levels = makeButton("★     LEVELS", PURPLE, 17);
         levels.setOnClickListener(v -> showLevels());
         addMenuButton(levels, 13);
 
         Button scores = makeButton(
-                "🏆     HIGH SCORES",
-                ORANGE,
-                17
+                "🏆     HIGH SCORES", ORANGE, 17
         );
-
         scores.setOnClickListener(v -> showScores());
         addMenuButton(scores, 10);
 
-        Button settings = makeButton(
-                "⚙     SETTINGS",
-                BLUE,
-                17
+        Button settingsButton = makeButton(
+                "⚙     SETTINGS", BLUE, 17
         );
-
-        settings.setOnClickListener(v -> showSettings());
-        addMenuButton(settings, 10);
+        settingsButton.setOnClickListener(v -> showSettings());
+        addMenuButton(settingsButton, 10);
     }
 
     private void addMenuButton(Button button, int margin) {
-
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, dp(56));
 
         params.topMargin = dp(margin);
-
         root.addView(button, params);
     }
 
     private void addFooter() {
-
         TextView footer = makeText(
                 "MADE FOR SWEET MOMENTS",
-                11,
-                Color.rgb(145, 120, 154),
-                true
+                11, Color.rgb(145, 120, 154), true
         );
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, dp(42));
 
         params.topMargin = dp(10);
-
         root.addView(footer, params);
     }
 
@@ -343,7 +270,6 @@ public class MainActivity extends Activity {
             int color,
             boolean bold
     ) {
-
         TextView view = new TextView(this);
 
         view.setText(value);
@@ -363,7 +289,6 @@ public class MainActivity extends Activity {
             int color,
             int size
     ) {
-
         Button button = new Button(this);
 
         button.setText(label);
@@ -379,26 +304,20 @@ public class MainActivity extends Activity {
     }
 
     private GradientDrawable rounded(int color, int radius) {
-
         GradientDrawable drawable = new GradientDrawable();
-
         drawable.setColor(color);
         drawable.setCornerRadius(dp(radius));
-
         return drawable;
     }
 
     private int dp(int value) {
-
         return (int) (
                 value * getResources()
-                        .getDisplayMetrics()
-                        .density + 0.5f
+                        .getDisplayMetrics().density + 0.5f
         );
     }
 
     private void startGame(int level) {
-
         Intent intent = new Intent(
                 MainActivity.this,
                 GameActivity.class
@@ -409,7 +328,6 @@ public class MainActivity extends Activity {
     }
 
     private void showLevels() {
-
         String[] levels = new String[100];
 
         for (int i = 0; i < levels.length; i++) {
@@ -425,7 +343,6 @@ public class MainActivity extends Activity {
     }
 
     private void showScores() {
-
         int highScore = preferences.getInt("high_score", 0);
         int highestLevel = preferences.getInt("highest_level", 1);
 
@@ -442,39 +359,56 @@ public class MainActivity extends Activity {
     }
 
     private void showSettings() {
-
         String[] options = {
-                "Music and sound",
-                "About Candy Pop"
+                "🎵  Background Music",
+                "🔊  Sound Effects"
+        };
+
+        boolean[] checked = {
+                settings.getBoolean("music_enabled", true),
+                settings.getBoolean("sound_enabled", true)
         };
 
         new AlertDialog.Builder(this)
-                .setTitle("⚙ SETTINGS")
-                .setItems(options, (dialog, which) -> {
+                .setTitle("⚙  SOUND SETTINGS")
+                .setMultiChoiceItems(
+                        options,
+                        checked,
+                        (dialog, which, isChecked) -> {
+                            if (which == 0) {
+                                settings.edit()
+                                        .putBoolean(
+                                                "music_enabled",
+                                                isChecked
+                                        )
+                                        .apply();
+                            } else {
+                                settings.edit()
+                                        .putBoolean(
+                                                "sound_enabled",
+                                                isChecked
+                                        )
+                                        .apply();
+                            }
+                        }
+                )
+                .setPositiveButton("ABOUT", (dialog, which) ->
+                        showAbout())
+                .setNegativeButton("DONE", null)
+                .show();
+    }
 
-                    if (which == 0) {
-                        new AlertDialog.Builder(this)
-                                .setTitle("Music and Sound")
-                                .setMessage(
-                                        "Music and sound controls "
-                                                + "will be connected "
-                                                + "in a later update."
-                                )
-                                .setPositiveButton("OK", null)
-                                .show();
-                    } else {
-                        new AlertDialog.Builder(this)
-                                .setTitle("About Candy Pop")
-                                .setMessage(
-                                        "Connect candies, create combos, "
-                                                + "and enjoy 100 levels "
-                                                + "of candy fun!"
-                                )
-                                .setPositiveButton("OK", null)
-                                .show();
-                    }
-                })
-                .setNegativeButton("CLOSE", null)
+    private void showAbout() {
+        new AlertDialog.Builder(this)
+                .setTitle("🍬 ABOUT CANDY POP")
+                .setMessage(
+                        "Welcome to Candy Pop!\n\n"
+                                + "Connect candies, create combos, "
+                                + "beat challenges and enjoy 100 levels "
+                                + "of colourful fun.\n\n"
+                                + "Made for kids and adults."
+                )
+                .setPositiveButton("LET'S PLAY!", null)
                 .show();
     }
 }
