@@ -1,6 +1,7 @@
 package com.candypop.game;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.Window;
@@ -9,6 +10,7 @@ import android.view.WindowManager;
 public class GameActivity extends Activity {
 
     private MediaPlayer musicPlayer;
+    private SharedPreferences settings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,12 +23,28 @@ public class GameActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
 
+        settings = getSharedPreferences(
+                "CandyPopSettings",
+                MODE_PRIVATE
+        );
+
         setContentView(new GameView(this));
 
-        startMusic();
+        updateMusic();
     }
 
-    private void startMusic() {
+    private void updateMusic() {
+        boolean musicEnabled = settings.getBoolean(
+                "music_enabled",
+                true
+        );
+
+        if (!musicEnabled) {
+            if (musicPlayer != null && musicPlayer.isPlaying()) {
+                musicPlayer.pause();
+            }
+            return;
+        }
 
         if (musicPlayer == null) {
             musicPlayer = MediaPlayer.create(
@@ -46,24 +64,25 @@ public class GameActivity extends Activity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
+    protected void onResume() {
+        super.onResume();
 
-        if (musicPlayer != null && musicPlayer.isPlaying()) {
-            musicPlayer.pause();
+        if (settings != null) {
+            updateMusic();
         }
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onPause() {
+        if (musicPlayer != null && musicPlayer.isPlaying()) {
+            musicPlayer.pause();
+        }
 
-        startMusic();
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
-
         if (musicPlayer != null) {
             if (musicPlayer.isPlaying()) {
                 musicPlayer.stop();
