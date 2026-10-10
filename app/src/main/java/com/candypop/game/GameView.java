@@ -471,6 +471,9 @@ public class GameView extends View {
     private int getGuaranteedPathLength() {
 
         int required = minimumConnection;
+        if (objectiveType == OBJECTIVE_CONNECTIONS) {
+            required = Math.max(required, objectiveTarget);
+        }
 
         if (objectiveType == OBJECTIVE_LONG
                 || objectiveType == OBJECTIVE_MIXED) {
@@ -486,7 +489,7 @@ public class GameView extends View {
          * Cap the guaranteed path so it remains achievable without
          * forcing the whole board to become one candy type.
          */
-        required = Math.min(required, 12);
+        required = Math.min(required, ROWS * COLS);
 
         return required;
     }
@@ -732,17 +735,7 @@ public class GameView extends View {
             }
         }
 
-        drawBoard(canvas);
-        drawCombo(canvas);
-        drawObjectivePanel(canvas);
-        drawEffects(canvas);
-
-        if (gameFinished) {
-            drawLevelComplete(canvas);
-        }
-
-        animationHandler.removeCallbacks(animationRunnable);
-        animationHandler.post(animationRunnable);
+        return false;
     }
 
     private boolean findPathLength(
