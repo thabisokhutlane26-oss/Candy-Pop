@@ -103,41 +103,44 @@ public class GameView extends View {
     };
 
     private final Runnable animationRunnable = new Runnable() {
-        @Override
-        public void run() {
+    @Override
+    public void run() {
 
-            if (!animating) {
-                return;
-            }
+        if (!animating) {
+            return;
+        }
 
-            long elapsed =
-                    System.currentTimeMillis() - popStartTime;
+        long elapsed =
+                System.currentTimeMillis() - popStartTime;
 
-            if (elapsed < 260) {
-                invalidate();
-                animationHandler.postDelayed(this, 16);
-                return;
-            }
-
-            for (int[] cell : poppingCells) {
-                if (cell[0] >= 0 && cell[0] < ROWS
-                        && cell[1] >= 0 && cell[1] < COLS) {
-                    board[cell[0]][cell[1]] = -1;
-                }
-            }
-
-            refillBoard();
-
-            poppingCells.clear();
-            animating = false;
-
+        if (elapsed < 260) {
             invalidate();
+            animationHandler.postDelayed(this, 16);
+            return;
+        }
 
-            if (levelObjectiveComplete()) {
-                levelComplete();
+        for (int[] cell : poppingCells) {
+            if (cell[0] >= 0 && cell[0] < ROWS
+                    && cell[1] >= 0 && cell[1] < COLS) {
+                board[cell[0]][cell[1]] = -1;
             }
         }
-    };
+
+        refillBoard();
+
+        poppingCells.clear();
+        animating = false;
+
+        invalidate();
+
+        // Do not end the level when the objective is reached.
+        // Let the countdown determine when the level ends.
+        if (secondsLeft <= 0) {
+            showTimeUpDialog();
+        }
+    }
+};
+ 
 
     public GameView(Context context) {
         super(context);
@@ -3390,42 +3393,40 @@ public class GameView extends View {
 
     private void showTimeUpDialog() {
 
-        if (gameFinished || animating) {
-            return;
-        }
-
-        gameFinished = true;
-
-        timerHandler.removeCallbacks(
-                timerRunnable
-        );
-
-        new AlertDialog.Builder(
-                getContext()
-        )
-                .setTitle(
-                        "⏰ TIME'S UP!"
-                )
-                .setMessage(
-                        "Your score: "
-                                + score
-                                + "\n\n"
-                                + "Objective:\n"
-                                + getObjectiveText()
-                )
-                .setCancelable(false)
-                .setPositiveButton(
-                        "RETRY",
-                        (dialog, which) ->
-                                restartLevel()
-                )
-                .setNegativeButton(
-                        "HOME",
-                        (dialog, which) ->
-                                goHome()
-                )
-                .show();
+    if (gameFinished || animating) {
+        return;
     }
+
+    timerHandler.removeCallbacks(timerRunnable);
+
+    // If the objective is complete, finish the level.
+    if (levelObjectiveComplete()) {
+        levelComplete();
+        return;
+    }
+
+    // Otherwise, the objective was not completed in time.
+    gameFinished = true;
+
+    new AlertDialog.Builder(getContext())
+            .setTitle("⏰ TIME'S UP!")
+            .setMessage(
+                    "Your score: " + score
+                            + "\n\n"
+                            + "Objective:\n"
+                            + getObjectiveText()
+            )
+            .setCancelable(false)
+            .setPositiveButton(
+                    "RETRY",
+                    (dialog, which) -> restartLevel()
+            )
+            .setNegativeButton(
+                    "HOME",
+                    (dialog, which) -> goHome()
+            )
+            .show();
+}
 
     private void restartLevel() {
 
