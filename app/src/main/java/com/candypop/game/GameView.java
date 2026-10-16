@@ -185,8 +185,6 @@ public class GameView extends View {
 
         createBoard();
         setupLevel();
-
-        timerHandler.postDelayed(timerRunnable, 1000);
     }
 
     private int getCandyColor(int type) {
