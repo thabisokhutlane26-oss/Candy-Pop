@@ -88,20 +88,34 @@ public class GameView extends View {
     private static final int OBJECTIVE_MIXED = 4;
 
     private final Runnable timerRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!gameFinished && !animating) {
-                if (secondsLeft > 0) {
-                    secondsLeft--;
-                    invalidate();
-                    timerHandler.postDelayed(this, 1000);
-                } else {
-                    showTimeUpDialog();
-                }
+    @Override
+    public void run() {
+
+        if (gameFinished) {
+            return;
+        }
+
+        if (secondsLeft > 0) {
+            secondsLeft--;
+
+            invalidate();
+
+            // The countdown must continue even while
+            // candies are popping or the board is refilling.
+            timerHandler.postDelayed(this, 1000);
+
+        } else {
+
+            // If a candy animation is finishing, wait briefly.
+            // The animation will call showTimeUpDialog() when finished.
+            if (animating) {
+                timerHandler.postDelayed(this, 100);
+            } else {
+                showTimeUpDialog();
             }
         }
-    };
-
+    }
+};
     private final Runnable animationRunnable = new Runnable() {
     @Override
     public void run() {
