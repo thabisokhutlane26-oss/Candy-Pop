@@ -1,3 +1,4 @@
+
 package com.candypop.game;
 
 import android.app.Activity;
@@ -28,7 +29,15 @@ public class GameActivity extends Activity {
                 MODE_PRIVATE
         );
 
-        setContentView(new GameView(this));
+        int selectedLevel = getIntent().getIntExtra(
+                "level",
+                1
+        );
+
+        GameView gameView = new GameView(this);
+        gameView.setLevel(selectedLevel);
+
+        setContentView(gameView);
 
         updateMusic();
     }
