@@ -29,15 +29,7 @@ public class GameActivity extends Activity {
                 MODE_PRIVATE
         );
 
-        int selectedLevel = getIntent().getIntExtra(
-                "level",
-                1
-        );
-
-        GameView gameView = new GameView(this);
-        gameView.setLevel(selectedLevel);
-
-        setContentView(gameView);
+        setContentView(new GameView(this));
 
         updateMusic();
     }
