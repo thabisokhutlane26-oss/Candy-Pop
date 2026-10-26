@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -3356,6 +3357,23 @@ public class GameView extends View {
         }
 
         gameFinished = true;
+
+        SharedPreferences progress = getContext()
+        .getSharedPreferences(
+                "CandyPopScores",
+                Context.MODE_PRIVATE
+        );
+
+int highestLevel = progress.getInt(
+        "highest_level",
+        1
+);
+
+if (level + 1 > highestLevel && level < MAX_LEVEL) {
+    progress.edit()
+            .putInt("highest_level", level + 1)
+            .apply();
+}
 
         timerHandler.removeCallbacks(
                 timerRunnable
