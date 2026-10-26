@@ -187,6 +187,20 @@ public class GameView extends View {
         setupLevel();
     }
 
+    public void setLevel(int selectedLevel) {
+    if (selectedLevel < 1) {
+        selectedLevel = 1;
+    }
+
+    if (selectedLevel > MAX_LEVEL) {
+        selectedLevel = MAX_LEVEL;
+    }
+
+    level = selectedLevel;
+    setupLevel();
+}
+
+
     private int getCandyColor(int type) {
         switch (type) {
             case 0:
