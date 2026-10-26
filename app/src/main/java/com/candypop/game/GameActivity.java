@@ -27,12 +27,17 @@ protected void onCreate(Bundle savedInstanceState) {
             "CandyPopSettings",  
             MODE_PRIVATE  
     );  
+   
+    int selectedLevel = getIntent().getIntExtra("level", 1);
 
-    setContentView(new GameView(this));  
+GameView gameView = new GameView(this);
+gameView.setLevel(selectedLevel);
 
-    updateMusic();  
-}  
+setContentView(gameView);
+updateMusic();  
 
+} 
+ 
 private void updateMusic() {  
     boolean musicEnabled = settings.getBoolean(  
             "music_enabled",  
