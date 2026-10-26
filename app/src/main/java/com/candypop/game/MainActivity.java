@@ -216,7 +216,10 @@ public class MainActivity extends Activity {
         );
 
         play.setElevation(dp(4));
-        play.setOnClickListener(v -> startGame(1));
+        
+        int highestLevel = preferences.getInt("highest_level", 1);
+
+        play.setOnClickListener(v -> startGame(highestLevel));
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, dp(72));
