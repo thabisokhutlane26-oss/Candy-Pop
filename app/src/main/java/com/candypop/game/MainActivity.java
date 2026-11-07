@@ -1,3 +1,4 @@
+
 package com.candypop.game;
 
 import android.app.Activity;
@@ -18,18 +19,21 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
 
-    private static final int PINK = Color.rgb(255, 75, 139);
-    private static final int PURPLE = Color.rgb(111, 67, 218);
-    private static final int BLUE = Color.rgb(54, 139, 225);
-    private static final int GREEN = Color.rgb(57, 183, 105);
-    private static final int ORANGE = Color.rgb(255, 148, 57);
-    private static final int DARK = Color.rgb(59, 38, 83);
-    private static final int BACKGROUND = Color.rgb(255, 242, 250);
+    private static final int BG = Color.rgb(250, 246, 255);
+    private static final int DARK = Color.rgb(48, 35, 75);
+    private static final int MUTED = Color.rgb(126, 112, 145);
+    private static final int PINK = Color.rgb(239, 65, 133);
+    private static final int PURPLE = Color.rgb(119, 78, 218);
+    private static final int BLUE = Color.rgb(65, 145, 225);
+    private static final int GREEN = Color.rgb(42, 180, 112);
+    private static final int ORANGE = Color.rgb(245, 145, 55);
     private static final int WHITE = Color.WHITE;
 
-    private LinearLayout root;
-    private SharedPreferences preferences;
+    private SharedPreferences scores;
+    private SharedPreferences progress;
     private SharedPreferences settings;
+
+    private LinearLayout root;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,275 +46,362 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
 
-        getWindow().setNavigationBarColor(BACKGROUND);
+        getWindow().setNavigationBarColor(BG);
+        getWindow().setStatusBarColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        );
 
-        preferences = getSharedPreferences(
-                "CandyPopScores",
-                MODE_PRIVATE
+        scores = getSharedPreferences(
+                "CandyPopScores", MODE_PRIVATE
+        );
+
+        progress = getSharedPreferences(
+                "CandyJolt", MODE_PRIVATE
         );
 
         settings = getSharedPreferences(
-                "CandyPopSettings",
-                MODE_PRIVATE
+                "CandyPopSettings", MODE_PRIVATE
         );
 
         showHome();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (root != null) {
+            showHome();
+        }
+    }
+
     private void showHome() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(BACKGROUND);
+        scroll.setBackgroundColor(BG);
+        scroll.setClipToPadding(false);
 
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(22), dp(14), dp(22), dp(22));
+        root.setPadding(dp(20), dp(15), dp(20), dp(25));
 
         scroll.addView(root);
         setContentView(scroll);
 
-        addTopBar();
-        addLogo();
-        addCandyRow();
-        addTagline();
+        addHeader();
+        addHero();
+        addProgress();
         addPlayButton();
-        addMenuButtons();
+        addMenu();
         addFooter();
     }
 
-    private void addTopBar() {
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
+    private void addHeader() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView brand = makeText(
-                "CANDY POP", 19, DARK, true
+        LinearLayout brand = new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
+
+        TextView name = text(
+                "CANDYJOLT", 22, DARK, true
         );
+        name.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
 
-        bar.addView(
+        TextView subtitle = text(
+                "THE SWEET MATCH ADVENTURE",
+                9, MUTED, true
+        );
+        subtitle.setGravity(Gravity.LEFT);
+
+        brand.addView(name);
+        brand.addView(subtitle);
+
+        header.addView(
                 brand,
-                new LinearLayout.LayoutParams(0, dp(44), 1)
+                new LinearLayout.LayoutParams(0, -2, 1)
         );
 
-        TextView levels = makeText(
+        TextView levelBadge = text(
                 "★  100 LEVELS", 12, PURPLE, true
         );
-
-        levels.setPadding(dp(12), 0, dp(12), 0);
-        levels.setBackground(rounded(
-                Color.rgb(235, 224, 255), 24
-        ));
-
-        bar.addView(
-                levels,
-                new LinearLayout.LayoutParams(-2, dp(34))
+        levelBadge.setPadding(
+                dp(13), dp(9), dp(13), dp(9)
+        );
+        levelBadge.setBackground(
+                rounded(Color.rgb(239, 230, 255), 30)
         );
 
-        root.addView(
-                bar,
-                new LinearLayout.LayoutParams(-1, dp(45))
-        );
+        header.addView(levelBadge);
+
+        root.addView(header);
     }
 
-    private void addLogo() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(12), dp(18), dp(12), dp(18));
+    private void addHero() {
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(
+                dp(18), dp(25), dp(18), dp(23)
+        );
 
         GradientDrawable gradient = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 new int[]{
-                        Color.rgb(255, 207, 233),
-                        Color.rgb(232, 216, 255),
-                        Color.rgb(210, 236, 255)
+                        Color.rgb(255, 183, 213),
+                        Color.rgb(220, 191, 255),
+                        Color.rgb(184, 221, 255)
                 }
         );
 
         gradient.setCornerRadius(dp(28));
-        card.setBackground(gradient);
+        hero.setBackground(gradient);
+        hero.setElevation(dp(3));
 
-        card.addView(
-                makeText("WELCOME TO", 13, PURPLE, true),
-                new LinearLayout.LayoutParams(-1, dp(27))
+        TextView decoration = text(
+                "🍓   🍊   🍇   🍋",
+                29, WHITE, true
         );
 
-        card.addView(
-                makeText("CANDY", 45, PINK, true),
-                new LinearLayout.LayoutParams(-1, dp(59))
+        TextView title = text(
+                "LET'S PLAY!", 31, DARK, true
         );
 
-        card.addView(
-                makeText("P O P !", 32, PURPLE, true),
-                new LinearLayout.LayoutParams(-1, dp(45))
+        TextView description = text(
+                "Match delicious treats and complete\n"
+                        + "your way through 100 exciting levels.",
+                13, DARK, false
         );
 
-        card.addView(
-                makeText(
-                        "A SWEET WORLD OF FUN",
-                        12, DARK, true
-                ),
-                new LinearLayout.LayoutParams(-1, dp(28))
-        );
+        description.setLineSpacing(dp(3), 1f);
+
+        hero.addView(decoration);
+        addSpace(hero, 9);
+        hero.addView(title);
+        addSpace(hero, 7);
+        hero.addView(description);
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, -2);
 
-        params.topMargin = dp(10);
+        params.topMargin = dp(22);
+        root.addView(hero, params);
+    }
+
+    private void addProgress() {
+        int highestLevel = Math.max(
+                1,
+                Math.min(100,
+                        progress.getInt("highest_level", 1))
+        );
+
+        int highScore = scores.getInt("high_score", 0);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(17), dp(15), dp(17), dp(15));
+        card.setBackground(rounded(WHITE, 22));
+        card.setElevation(dp(2));
+
+        TextView heading = text(
+                "YOUR PROGRESS", 12, MUTED, true
+        );
+        heading.setGravity(Gravity.LEFT);
+
+        card.addView(heading);
+        addSpace(card, 12);
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+
+        addStat(stats, "LEVEL", String.valueOf(highestLevel), PURPLE);
+        addStat(stats, "HIGH SCORE", String.valueOf(highScore), PINK);
+        addStat(stats, "TOTAL", "100", BLUE);
+
+        card.addView(stats);
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, -2);
+
+        params.topMargin = dp(17);
         root.addView(card, params);
     }
 
-    private void addCandyRow() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-
-        addCandy(row, "●", Color.rgb(255, 77, 120));
-        addCandy(row, "◆", Color.rgb(255, 166, 55));
-        addCandy(row, "●", Color.rgb(79, 188, 105));
-        addCandy(row, "◆", Color.rgb(82, 132, 255));
-        addCandy(row, "●", Color.rgb(191, 101, 225));
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(-1, dp(52));
-
-        params.topMargin = dp(5);
-        root.addView(row, params);
-    }
-
-    private void addCandy(
-            LinearLayout row,
-            String symbol,
+    private void addStat(
+            LinearLayout parent,
+            String label,
+            String value,
             int color
     ) {
-        TextView candy = makeText(symbol, 30, color, true);
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
 
-        row.addView(
-                candy,
-                new LinearLayout.LayoutParams(0, -1, 1)
-        );
-    }
+        TextView number = text(value, 24, color, true);
+        TextView caption = text(label, 9, MUTED, true);
 
-    private void addTagline() {
-        root.addView(
-                makeText(
-                        "Small Game • Big Smiles",
-                        20, DARK, true
-                ),
-                new LinearLayout.LayoutParams(-1, dp(42))
-        );
+        item.addView(number);
+        addSpace(item, 3);
+        item.addView(caption);
 
-        root.addView(
-                makeText(
-                        "Connect candies. Make combos. Beat levels!",
-                        13, Color.rgb(126, 104, 145), false
-                ),
-                new LinearLayout.LayoutParams(-1, dp(30))
+        parent.addView(
+                item,
+                new LinearLayout.LayoutParams(0, -2, 1)
         );
     }
 
     private void addPlayButton() {
-        Button play = makeButton(
-                "▶     PLAY NOW", GREEN, 22
+        Button play = button(
+                "▶     CONTINUE PLAYING", GREEN, 18
         );
 
         play.setElevation(dp(4));
-        
-        int highestLevel = preferences.getInt("highest_level", 1);
+
+        int highestLevel = Math.max(
+                1,
+                Math.min(100,
+                        progress.getInt("highest_level", 1))
+        );
 
         play.setOnClickListener(v -> startGame(highestLevel));
 
         LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(-1, dp(72));
+                new LinearLayout.LayoutParams(-1, dp(62));
 
-        params.topMargin = dp(12);
+        params.topMargin = dp(20);
         root.addView(play, params);
     }
 
-    private void addMenuButtons() {
-        Button levels = makeButton("★     LEVELS", PURPLE, 17);
-        levels.setOnClickListener(v -> showLevels());
-        addMenuButton(levels, 13);
-
-        Button scores = makeButton(
-                "🏆     HIGH SCORES", ORANGE, 17
+    private void addMenu() {
+        TextView heading = text(
+                "EXPLORE THE GAME", 12, MUTED, true
         );
-        scores.setOnClickListener(v -> showScores());
-        addMenuButton(scores, 10);
+        heading.setGravity(Gravity.LEFT);
 
-        Button settingsButton = makeButton(
-                "⚙     SETTINGS", BLUE, 17
+        LinearLayout.LayoutParams headingParams =
+                new LinearLayout.LayoutParams(-1, dp(30));
+
+        headingParams.topMargin = dp(21);
+        root.addView(heading, headingParams);
+
+        LinearLayout rowOne = new LinearLayout(this);
+        rowOne.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button levels = button("★  LEVELS", PURPLE, 14);
+        levels.setOnClickListener(v -> showLevels());
+
+        Button scoresButton = button("🏆  SCORES", ORANGE, 14);
+        scoresButton.setOnClickListener(v -> showScores());
+
+        addMenuItem(rowOne, levels);
+        addMenuItem(rowOne, scoresButton);
+        root.addView(rowOne);
+
+        LinearLayout rowTwo = new LinearLayout(this);
+        rowTwo.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button settingsButton = button(
+                "⚙  SETTINGS", BLUE, 14
         );
         settingsButton.setOnClickListener(v -> showSettings());
-        addMenuButton(settingsButton, 10);
+
+        Button aboutButton = button(
+                "ⓘ  ABOUT", PINK, 14
+        );
+        aboutButton.setOnClickListener(v -> showAbout());
+
+        addMenuItem(rowTwo, settingsButton);
+        addMenuItem(rowTwo, aboutButton);
+
+        LinearLayout.LayoutParams rowParams =
+                new LinearLayout.LayoutParams(-1, dp(52));
+
+        rowParams.topMargin = dp(10);
+        root.addView(rowTwo, rowParams);
     }
 
-    private void addMenuButton(Button button, int margin) {
+    private void addMenuItem(
+            LinearLayout row,
+            Button button
+    ) {
         LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(-1, dp(56));
+                new LinearLayout.LayoutParams(0, dp(52), 1);
 
-        params.topMargin = dp(margin);
-        root.addView(button, params);
+        params.setMargins(dp(4), 0, dp(4), 0);
+        row.addView(button, params);
     }
 
     private void addFooter() {
-        TextView footer = makeText(
-                "MADE FOR SWEET MOMENTS",
-                11, Color.rgb(145, 120, 154), true
+        TextView footer = text(
+                "MADE FOR SWEET MOMENTS  •  CANDYJOLT",
+                9, MUTED, true
         );
 
         LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(-1, dp(42));
+                new LinearLayout.LayoutParams(-1, dp(40));
 
-        params.topMargin = dp(10);
+        params.topMargin = dp(14);
         root.addView(footer, params);
     }
 
-    private TextView makeText(
+    private TextView text(
             String value,
             int size,
             int color,
             boolean bold
     ) {
         TextView view = new TextView(this);
-
         view.setText(value);
         view.setTextSize(size);
         view.setTextColor(color);
         view.setGravity(Gravity.CENTER);
 
         if (bold) {
-            view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            view.setTypeface(
+                    Typeface.DEFAULT,
+                    Typeface.BOLD
+            );
         }
 
         return view;
     }
 
-    private Button makeButton(
+    private Button button(
             String label,
             int color,
             int size
     ) {
-        Button button = new Button(this);
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextColor(WHITE);
+        b.setTextSize(size);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(5), 0, dp(5), 0);
+        b.setBackground(rounded(color, 17));
 
-        button.setText(label);
-        button.setTextColor(WHITE);
-        button.setTextSize(size);
-        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setGravity(Gravity.CENTER);
-        button.setAllCaps(false);
-        button.setPadding(dp(8), 0, dp(8), 0);
-        button.setBackground(rounded(color, 19));
-
-        return button;
+        return b;
     }
 
-    private GradientDrawable rounded(int color, int radius) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(dp(radius));
-        return drawable;
+    private GradientDrawable rounded(
+            int color,
+            int radius
+    ) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(color);
+        shape.setCornerRadius(dp(radius));
+        return shape;
+    }
+
+    private void addSpace(LinearLayout parent, int height) {
+        TextView space = new TextView(this);
+        parent.addView(
+                space,
+                new LinearLayout.LayoutParams(1, dp(height))
+        );
     }
 
     private int dp(int value) {
@@ -333,12 +424,12 @@ public class MainActivity extends Activity {
     private void showLevels() {
         String[] levels = new String[100];
 
-        for (int i = 0; i < levels.length; i++) {
+        for (int i = 0; i < 100; i++) {
             levels[i] = "Level " + (i + 1);
         }
 
         new AlertDialog.Builder(this)
-                .setTitle("★ CHOOSE A LEVEL")
+                .setTitle("CHOOSE A LEVEL")
                 .setItems(levels, (dialog, which) ->
                         startGame(which + 1))
                 .setNegativeButton("CLOSE", null)
@@ -346,25 +437,25 @@ public class MainActivity extends Activity {
     }
 
     private void showScores() {
-        int highScore = preferences.getInt("high_score", 0);
-        int highestLevel = preferences.getInt("highest_level", 1);
+        int highScore = scores.getInt("high_score", 0);
+        int highestLevel = progress.getInt("highest_level", 1);
 
         new AlertDialog.Builder(this)
-                .setTitle("🏆 YOUR PROGRESS")
+                .setTitle("YOUR GAME PROGRESS")
                 .setMessage(
-                        "High Score: " + highScore
-                                + "\nHighest Level: " + highestLevel
+                        "Highest level: " + highestLevel
+                                + "\nHigh score: " + highScore
                 )
                 .setPositiveButton("PLAY", (dialog, which) ->
-                        startGame(1))
+                        startGame(highestLevel))
                 .setNegativeButton("CLOSE", null)
                 .show();
     }
 
     private void showSettings() {
         String[] options = {
-                "🎵  Background Music",
-                "🔊  Sound Effects"
+                "Background Music",
+                "Sound Effects"
         };
 
         boolean[] checked = {
@@ -373,43 +464,35 @@ public class MainActivity extends Activity {
         };
 
         new AlertDialog.Builder(this)
-                .setTitle("⚙  SOUND SETTINGS")
+                .setTitle("SOUND SETTINGS")
                 .setMultiChoiceItems(
                         options,
                         checked,
-                        (dialog, which, isChecked) -> {
-                            if (which == 0) {
-                                settings.edit()
-                                        .putBoolean(
-                                                "music_enabled",
-                                                isChecked
-                                        )
-                                        .apply();
-                            } else {
-                                settings.edit()
-                                        .putBoolean(
-                                                "sound_enabled",
-                                                isChecked
-                                        )
-                                        .apply();
-                            }
+                        (dialog, which, enabled) -> {
+                            String key = which == 0
+                                    ? "music_enabled"
+                                    : "sound_enabled";
+
+                            settings.edit()
+                                    .putBoolean(key, enabled)
+                                    .apply();
                         }
                 )
-                .setPositiveButton("ABOUT", (dialog, which) ->
+                .setPositiveButton("DONE", null)
+                .setNeutralButton("ABOUT", (dialog, which) ->
                         showAbout())
-                .setNegativeButton("DONE", null)
                 .show();
     }
 
     private void showAbout() {
         new AlertDialog.Builder(this)
-                .setTitle("🍬 ABOUT CANDY POP")
+                .setTitle("ABOUT CANDYJOLT")
                 .setMessage(
-                        "Welcome to Candy Pop!\n\n"
-                                + "Connect candies, create combos, "
-                                + "beat challenges and enjoy 100 levels "
-                                + "of colourful fun.\n\n"
-                                + "Made for kids and adults."
+                        "Welcome to CandyJolt!\n\n"
+                                + "Match fruits and sweets, "
+                                + "create bigger combos and "
+                                + "complete 100 exciting levels.\n\n"
+                                + "Enjoy the adventure!"
                 )
                 .setPositiveButton("LET'S PLAY!", null)
                 .show();
