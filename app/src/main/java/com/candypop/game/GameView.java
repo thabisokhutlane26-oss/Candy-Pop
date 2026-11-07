@@ -3,7 +3,6 @@ package com.candypop.game;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -15,8 +14,8 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 public class GameView extends View {
@@ -26,12 +25,14 @@ public class GameView extends View {
     private static final int CANDY_TYPES = 6;
     private static final int MAX_LEVEL = 100;
 
+    private static final int OBJECTIVE_CANDIES = 0;
+    private static final int OBJECTIVE_CONNECTIONS = 1;
+    private static final int OBJECTIVE_LONG = 2;
+    private static final int OBJECTIVE_MIXED = 3;
+
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint lineGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint hudPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint effectPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final Random random = new Random();
@@ -39,6 +40,7 @@ public class GameView extends View {
 
     private final List<int[]> selected = new ArrayList<>();
     private final List<int[]> poppingCells = new ArrayList<>();
+
     private final Path connectionPath = new Path();
 
     private final Handler timerHandler = new Handler();
@@ -50,14 +52,9 @@ public class GameView extends View {
     private float boardLeft;
     private float boardTop;
 
-    private boolean drawing = false;
-    private boolean gameFinished = false;
-    private boolean animating = false;
-
-    private float lastTouchX;
-    private float lastTouchY;
-    private float currentFingerX;
-    private float currentFingerY;
+    private boolean drawing;
+    private boolean animating;
+    private boolean gameFinished;
 
     private int connectionCandyType = -1;
 
@@ -68,52 +65,34 @@ public class GameView extends View {
     private int secondsLeft = 100;
     private int minimumConnection = 3;
 
-    private int objectiveType = 0;
-    private int objectiveTarget = 10;
+    private int objectiveType = OBJECTIVE_CANDIES;
+    private int objectiveTarget = 12;
+    private int longConnectionGoal = 0;
 
     private int candiesPoppedThisLevel = 0;
     private int connectionsThisLevel = 0;
-
-    private int longConnectionGoal = 0;
     private int longConnections = 0;
 
     private int combo = 0;
     private int bestCombo = 0;
 
-    private long popStartTime = 0L;
-
-    private static final int OBJECTIVE_CANDIES = 0;
-    private static final int OBJECTIVE_CONNECTIONS = 1;
-    private static final int OBJECTIVE_LONG = 2;
-    private static final int OBJECTIVE_COMBO = 3;
-    private static final int OBJECTIVE_MIXED = 4;
+    private long popStartTime;
 
     private final Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
-
             if (gameFinished) {
                 return;
             }
 
             if (secondsLeft > 0) {
                 secondsLeft--;
-
                 invalidate();
-
-                // The countdown must continue even while
-                // candies are popping or the board is refilling.
                 timerHandler.postDelayed(this, 1000);
-
+            } else if (animating) {
+                timerHandler.postDelayed(this, 100);
             } else {
-
-                // If a candy animation is finishing, wait briefly.
-                // The animation will call showTimeUpDialog() when finished.
-                if (animating) {
-                    timerHandler.postDelayed(this, 100);
-                } else {
-                    showTimeUpDialog();
-                }
+                showTimeUpDialog();
             }
         }
     };
@@ -121,7 +100,6 @@ public class GameView extends View {
     private final Runnable animationRunnable = new Runnable() {
         @Override
         public void run() {
-
             if (!animating) {
                 return;
             }
@@ -136,10 +114,7 @@ public class GameView extends View {
             }
 
             for (int[] cell : poppingCells) {
-                if (cell[0] >= 0 && cell[0] < ROWS
-                        && cell[1] >= 0 && cell[1] < COLS) {
-                    board[cell[0]][cell[1]] = -1;
-                }
+                board[cell[0]][cell[1]] = -1;
             }
 
             refillBoard();
@@ -149,8 +124,6 @@ public class GameView extends View {
 
             invalidate();
 
-            // Do not end the level when the objective is reached.
-            // Let the countdown determine when the level ends.
             if (secondsLeft <= 0) {
                 showTimeUpDialog();
             }
@@ -162,87 +135,29 @@ public class GameView extends View {
 
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
-        paint.setAntiAlias(true);
-        shadowPaint.setAntiAlias(true);
-        linePaint.setAntiAlias(true);
-        lineGlowPaint.setAntiAlias(true);
-        outlinePaint.setAntiAlias(true);
-        hudPaint.setAntiAlias(true);
-        effectPaint.setAntiAlias(true);
-
-        shadowPaint.setStyle(Paint.Style.FILL);
+        paint.setStyle(Paint.Style.FILL);
+        textPaint.setTextAlign(Paint.Align.CENTER);
 
         linePaint.setStyle(Paint.Style.STROKE);
         linePaint.setStrokeCap(Paint.Cap.ROUND);
         linePaint.setStrokeJoin(Paint.Join.ROUND);
 
-        lineGlowPaint.setStyle(Paint.Style.STROKE);
-        lineGlowPaint.setStrokeCap(Paint.Cap.ROUND);
-        lineGlowPaint.setStrokeJoin(Paint.Join.ROUND);
-
-        outlinePaint.setStyle(Paint.Style.STROKE);
-
         gameSound = new GameSound(context);
 
-        createBoard();
         setupLevel();
     }
 
     public void setLevel(int selectedLevel) {
-        if (selectedLevel < 1) {
-            selectedLevel = 1;
-        }
-
-        if (selectedLevel > MAX_LEVEL) {
-            selectedLevel = MAX_LEVEL;
-        }
-
-        level = selectedLevel;
+        level = Math.max(1, Math.min(MAX_LEVEL, selectedLevel));
         setupLevel();
     }
 
-    private int getCandyColor(int type) {
-        switch (type) {
-            case 0:
-                return Color.rgb(240, 75, 85);
-            case 1:
-                return Color.rgb(235, 45, 65);
-            case 2:
-                return Color.rgb(125, 65, 190);
-            case 3:
-                return Color.rgb(65, 160, 240);
-            case 4:
-                return Color.rgb(105, 55, 30);
-            case 5:
-                return Color.rgb(245, 75, 160);
-            default:
-                return Color.rgb(90, 190, 75);
-        }
-    }
-
-    private int[] getCandyColors(int type) {
-        int c = getCandyColor(type);
-
-        switch (type) {
-            case 0:
-                return new int[]{c, Color.rgb(255, 125, 135)};
-            case 1:
-                return new int[]{c, Color.rgb(255, 120, 135)};
-            case 2:
-                return new int[]{c, Color.rgb(190, 125, 235)};
-            case 3:
-                return new int[]{c, Color.rgb(150, 215, 255)};
-            case 4:
-                return new int[]{c, Color.rgb(175, 105, 65)};
-            case 5:
-                return new int[]{c, Color.rgb(255, 165, 215)};
-            default:
-                return new int[]{c, Color.rgb(170, 235, 120)};
-        }
+    private int dp(float value) {
+        return (int) (value * getResources()
+                .getDisplayMetrics().density + 0.5f);
     }
 
     private void setupLevel() {
-
         score = 0;
         combo = 0;
         bestCombo = 0;
@@ -251,45 +166,43 @@ public class GameView extends View {
         connectionsThisLevel = 0;
         longConnections = 0;
 
+        longConnectionGoal = 0;
+
         int cycle = (level - 1) % 6;
         int stage = (level - 1) / 6;
 
         if (cycle == 0) {
-
             timeLimit = 110;
             minimumConnection = 3;
             objectiveType = OBJECTIVE_CANDIES;
             objectiveTarget = 12 + stage * 2;
 
         } else if (cycle == 1) {
-
             timeLimit = 70;
             minimumConnection = 4;
             objectiveType = OBJECTIVE_CONNECTIONS;
             objectiveTarget = 7 + stage;
 
         } else if (cycle == 2) {
-
             timeLimit = 105;
             minimumConnection = 3;
             objectiveType = OBJECTIVE_CONNECTIONS;
             objectiveTarget = 5 + stage;
 
         } else if (cycle == 3) {
-
             timeLimit = 75;
             minimumConnection = 4;
             objectiveType = OBJECTIVE_LONG;
             objectiveTarget = 2 + stage / 2;
             longConnectionGoal = objectiveTarget;
 
-        } else if (cycle == 4) {            timeLimit = 130;
+        } else if (cycle == 4) {
+            timeLimit = 130;
             minimumConnection = 3;
             objectiveType = OBJECTIVE_CANDIES;
             objectiveTarget = 10 + stage * 2;
 
         } else {
-
             timeLimit = 60;
             minimumConnection = 4;
             objectiveType = OBJECTIVE_MIXED;
@@ -297,21 +210,13 @@ public class GameView extends View {
             longConnectionGoal = 3 + stage / 2;
         }
 
-        // Special challenge levels
         if (level == 10 || level == 25 || level == 50
                 || level == 75 || level == 100) {
-
             timeLimit = 90;
             minimumConnection = 4;
             objectiveType = OBJECTIVE_MIXED;
             objectiveTarget = 150 + level * 5;
             longConnectionGoal = 3 + level / 25;
-        }
-
-        // Keep the mixed objective's long-chain goal separate.
-        if (objectiveType != OBJECTIVE_LONG
-                && objectiveType != OBJECTIVE_MIXED) {
-            longConnectionGoal = 0;
         }
 
         secondsLeft = timeLimit;
@@ -321,7 +226,6 @@ public class GameView extends View {
 
         selected.clear();
         poppingCells.clear();
-
         connectionCandyType = -1;
 
         timerHandler.removeCallbacks(timerRunnable);
@@ -335,7 +239,6 @@ public class GameView extends View {
     }
 
     private void createBoard() {
-
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
                 board[row][col] = random.nextInt(CANDY_TYPES);
@@ -346,21 +249,11 @@ public class GameView extends View {
     }
 
     private void ensurePlayableBoard() {
-
         if (hasValidConnection()) {
             return;
         }
 
-        createGuaranteedPath();
-    }
-
-    private void createGuaranteedPath() {
-
         int type = random.nextInt(CANDY_TYPES);
-
-        int row = random.nextInt(ROWS);
-        int col = random.nextInt(COLS);
-
         int length = Math.max(3, minimumConnection);
 
         if (objectiveType == OBJECTIVE_LONG
@@ -368,98 +261,43 @@ public class GameView extends View {
             length = Math.max(length, 5);
         }
 
-        length = Math.min(length, ROWS * COLS);
+        int row = random.nextInt(ROWS);
+        int startCol = random.nextInt(COLS - length + 1);
 
-        List<int[]> path = createSnakePath(row, col, length);
-
-        for (int[] cell : path) {
-            board[cell[0]][cell[1]] = type;
+        for (int i = 0; i < length; i++) {
+            board[row][startCol + i] = type;
         }
-    }
-
-    private List<int[]> createSnakePath(
-            int startRow,
-            int startCol,
-            int length) {
-
-        List<int[]> path = new ArrayList<>();
-
-        boolean[][] visited = new boolean[ROWS][COLS];
-
-        int row = startRow;
-        int col = startCol;
-
-        path.add(new int[]{row, col});
-        visited[row][col] = true;
-
-        while (path.size() < length) {
-
-            List<int[]> choices = new ArrayList<>();
-
-            int[][] directions = {
-                    {0, 1},
-                    {0, -1},
-                    {1, 0},
-                    {-1, 0},
-                    {1, 1},
-                    {-1, -1},
-                    {1, -1},
-                    {-1, 1}
-            };
-
-            for (int[] direction : directions) {
-
-                int nextRow = row + direction[0];
-                int nextCol = col + direction[1];
-
-                if (nextRow >= 0 && nextRow < ROWS
-                        && nextCol >= 0 && nextCol < COLS
-                        && !visited[nextRow][nextCol]) {
-
-                    choices.add(new int[]{
-                            nextRow,
-                            nextCol
-                    });
-                }
-            }
-
-            if (choices.isEmpty()) {
-                break;
-            }
-
-            int[] next = choices.get(
-                    random.nextInt(choices.size())
-            );
-
-            row = next[0];
-            col = next[1];
-
-            visited[row][col] = true;
-            path.add(new int[]{row, col});
-        }
-
-        return path;
     }
 
     private boolean hasValidConnection() {
-
-        boolean[][] visited = new boolean[ROWS][COLS];
-
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
-
                 int type = board[row][col];
 
                 if (type < 0) {
                     continue;
                 }
 
-                if (searchConnection(
-                        row,
-                        col,
-                        type,
-                        visited,
-                        1)) {
+                int horizontal = 1;
+                for (int c = col + 1; c < COLS; c++) {
+                    if (board[row][c] == type) {
+                        horizontal++;
+                    } else {
+                        break;
+                    }
+                }
+
+                int vertical = 1;
+                for (int r = row + 1; r < ROWS; r++) {
+                    if (board[r][col] == type) {
+                        vertical++;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (horizontal >= minimumConnection
+                        || vertical >= minimumConnection) {
                     return true;
                 }
             }
@@ -468,121 +306,44 @@ public class GameView extends View {
         return false;
     }
 
-    private boolean searchConnection(
-            int row,
-            int col,
-            int type,
-            boolean[][] visited,
-            int count) {
-
-        if (count >= minimumConnection) {
-            return true;
-        }
-
-        visited[row][col] = true;
-
-        int[][] directions = {
-                {0, 1},
-                {0, -1},
-                {1, 0},
-                {-1, 0},
-                {1, 1},
-                {-1, -1},
-                {1, -1},
-                {-1, 1}
-        };
-
-        for (int[] direction : directions) {
-
-            int nextRow = row + direction[0];
-            int nextCol = col + direction[1];
-
-            if (nextRow < 0 || nextRow >= ROWS
-                    || nextCol < 0 || nextCol >= COLS) {
-                continue;
-            }
-
-            if (visited[nextRow][nextCol]) {
-                continue;
-            }
-
-            if (board[nextRow][nextCol] != type) {
-                continue;
-            }
-
-            if (searchConnection(
-                    nextRow,
-                    nextCol,
-                    type,
-                    visited,
-                    count + 1)) {
-
-                visited[row][col] = false;
-                return true;
-            }
-        }
-
-        visited[row][col] = false;
-        return false;
-    }
-
     private boolean isAdjacent(
-            int row1,
-            int col1,
-            int row2,
-            int col2) {
+            int row1, int col1,
+            int row2, int col2) {
 
-        int rowDifference = Math.abs(row1 - row2);
-        int colDifference = Math.abs(col1 - col2);
+        int dr = Math.abs(row1 - row2);
+        int dc = Math.abs(col1 - col2);
 
-        return rowDifference <= 1
-                && colDifference <= 1
-                && (rowDifference + colDifference > 0);
-    }
-
-    private boolean isSameCell(
-            int row1,
-            int col1,
-            int row2,
-            int col2) {
-
-        return row1 == row2 && col1 == col2;
+        return dr <= 1 && dc <= 1 && (dr + dc > 0);
     }
 
     private boolean isCellSelected(int row, int col) {
-
         for (int[] cell : selected) {
             if (cell[0] == row && cell[1] == col) {
                 return true;
             }
         }
-
         return false;
     }
 
     private void clearSelection() {
-
         selected.clear();
         connectionCandyType = -1;
         drawing = false;
-
         invalidate();
     }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        int width = getWidth();
-        int height = getHeight();
-
-        if (width <= 0 || height <= 0) {
+        if (getWidth() <= 0 || getHeight() <= 0) {
             return;
         }
 
         canvas.drawColor(Color.rgb(12, 17, 29));
 
-        drawBackground(canvas);
-        calculateBoardDimensions(width, height);
+        calculateBoardDimensions();
+
         drawHeader(canvas);
         drawLevelInfo(canvas);
         drawObjective(canvas);
@@ -593,238 +354,153 @@ public class GameView extends View {
         drawEffects(canvas);
     }
 
-    private void drawBackground(Canvas canvas) {
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(12, 17, 29));
-
-        canvas.drawRect(
-                0,
-                0,
-                getWidth(),
-                getHeight(),
-                paint
-        );
-
-        paint.setColor(Color.rgb(19, 28, 45));
-
-        canvas.drawCircle(
-                getWidth() * 0.1f,
-                getHeight() * 0.25f,
-                getWidth() * 0.35f,
-                paint
-        );
-
-        paint.setColor(Color.rgb(17, 35, 43));
-
-        canvas.drawCircle(
-                getWidth() * 0.9f,
-                getHeight() * 0.7f,
-                getWidth() * 0.3f,
-                paint
-        );
-    }
-
-    private void calculateBoardDimensions(
-            int width,
-            int height) {
+    private void calculateBoardDimensions() {
+        float width = getWidth();
+        float height = getHeight();
 
         float horizontalPadding = dp(14);
         float availableWidth = width - horizontalPadding * 2;
 
-        cellSize = availableWidth / COLS;
+        float availableHeight = height - dp(285);
 
-        float boardHeight = cellSize * ROWS;
-
-        float topArea = dp(250);
-        float bottomArea = dp(100);
-
-        if (height - topArea - bottomArea < boardHeight) {
-            float availableHeight =
-                    height - topArea - bottomArea;
-
-            cellSize = Math.min(
-                    cellSize,
-                    availableHeight / ROWS
-            );
-        }
-
-        boardLeft = (width - cellSize * COLS) / 2f;
-
-        boardTop = Math.max(
-                dp(210),
-                (height - cellSize * ROWS) / 2f
+        cellSize = Math.min(
+                availableWidth / COLS,
+                availableHeight / ROWS
         );
 
-        if (boardTop + cellSize * ROWS > height - dp(80)) {
-            boardTop = height - dp(80) - cellSize * ROWS;
-        }
+        cellSize = Math.max(dp(24), cellSize);
 
-        boardTop = Math.max(dp(190), boardTop);
+        boardLeft = (width - cellSize * COLS) / 2f;
+        boardTop = dp(245);
+
+        float maxBottom = height - dp(55);
+
+        if (boardTop + cellSize * ROWS > maxBottom) {
+            boardTop = Math.max(
+                    dp(205),
+                    maxBottom - cellSize * ROWS
+            );
+        }
     }
 
     private void drawHeader(Canvas canvas) {
-
-        float center = getWidth() / 2f;
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.WHITE);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(25));
-        paint.setFakeBoldText(true);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTextSize(dp(25));
+        textPaint.setFakeBoldText(true);
 
         canvas.drawText(
                 "CANDYJOLT",
-                center,
+                getWidth() / 2f,
                 dp(38),
-                paint
+                textPaint
         );
 
-        paint.setTextSize(dp(10));
-        paint.setColor(Color.rgb(145, 165, 190));
-        paint.setFakeBoldText(false);
+        textPaint.setFakeBoldText(false);
+        textPaint.setTextSize(dp(10));
+        textPaint.setColor(Color.rgb(145, 165, 190));
 
         canvas.drawText(
                 "CONNECT • POP • WIN",
-                center,
+                getWidth() / 2f,
                 dp(57),
-                paint
+                textPaint
         );
     }
 
     private void drawLevelInfo(Canvas canvas) {
-
-        float top = dp(72);
         float left = dp(14);
         float right = getWidth() - dp(14);
+        float top = dp(72);
 
-        drawRoundedPanel(
+        drawPanel(
                 canvas,
-                left,
-                top,
-                right,
-                top + dp(55),
+                left, top, right, top + dp(55),
                 Color.rgb(24, 36, 55),
                 dp(14)
         );
 
-        paint.setColor(Color.rgb(145, 165, 190));
-        paint.setTextSize(dp(10));
-        paint.setTextAlign(Paint.Align.LEFT);
-        paint.setFakeBoldText(true);
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(dp(10));
+        textPaint.setFakeBoldText(true);
+        textPaint.setColor(Color.rgb(145, 165, 190));
 
-        canvas.drawText(
-                "LEVEL",
-                left + dp(14),
-                top + dp(19),
-                paint
-        );
+        canvas.drawText("LEVEL", left + dp(14),
+                top + dp(19), textPaint);
 
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(dp(22));
+        textPaint.setTextSize(dp(22));
+        textPaint.setColor(Color.WHITE);
 
-        canvas.drawText(
-                String.valueOf(level),
-                left + dp(14),
-                top + dp(43),
-                paint
-        );
+        canvas.drawText(String.valueOf(level),
+                left + dp(14), top + dp(43), textPaint);
 
-        paint.setColor(Color.rgb(145, 165, 190));
-        paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setTextSize(dp(10));
+        textPaint.setTextAlign(Paint.Align.RIGHT);
+        textPaint.setTextSize(dp(10));
+        textPaint.setColor(Color.rgb(145, 165, 190));
 
-        canvas.drawText(
-                "SCORE",
-                right - dp(14),
-                top + dp(19),
-                paint
-        );
+        canvas.drawText("SCORE", right - dp(14),
+                top + dp(19), textPaint);
 
-        paint.setColor(Color.rgb(255, 210, 95));
-        paint.setTextSize(dp(22));
+        textPaint.setTextSize(dp(22));
+        textPaint.setColor(Color.rgb(255, 210, 95));
 
-        canvas.drawText(
-                String.valueOf(score),
-                right - dp(14),
-                top + dp(43),
-                paint
-        );
+        canvas.drawText(String.valueOf(score),
+                right - dp(14), top + dp(43), textPaint);
+
+        textPaint.setFakeBoldText(false);
+        textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     private void drawObjective(Canvas canvas) {
-
-        float top = dp(138);
         float left = dp(14);
         float right = getWidth() - dp(14);
+        float top = dp(138);
 
-        drawRoundedPanel(
+        drawPanel(
                 canvas,
-                left,
-                top,
-                right,
-                top + dp(45),
+                left, top, right, top + dp(45),
                 Color.rgb(24, 36, 55),
                 dp(12)
         );
 
-        paint.setTextAlign(Paint.Align.LEFT);
-        paint.setTextSize(dp(11));
-        paint.setFakeBoldText(true);
-        paint.setColor(Color.rgb(145, 165, 190));
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(dp(10));
+        textPaint.setFakeBoldText(true);
+        textPaint.setColor(Color.rgb(145, 165, 190));
 
-        canvas.drawText(
-                "LEVEL OBJECTIVE",
-                left + dp(12),
-                top + dp(17),
-                paint
-        );
+        canvas.drawText("LEVEL OBJECTIVE",
+                left + dp(12), top + dp(16), textPaint);
 
-        paint.setTextSize(dp(13));
-        paint.setColor(Color.WHITE);
+        textPaint.setTextSize(dp(13));
+        textPaint.setColor(Color.WHITE);
+        textPaint.setFakeBoldText(false);
 
-        String objective = getObjectiveText();
+        canvas.drawText(getObjectiveText(),
+                left + dp(12), top + dp(35), textPaint);
 
-        canvas.drawText(
-                objective,
-                left + dp(12),
-                top + dp(35),
-                paint
-        );
-
-        paint.setFakeBoldText(false);
+        textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     private String getObjectiveText() {
-
         switch (objectiveType) {
-
             case OBJECTIVE_CANDIES:
-                return "Pop " + objectiveTarget
-                        + " candies  ("
-                        + candiesPoppedThisLevel
-                        + "/" + objectiveTarget + ")";
+                return "Pop " + objectiveTarget + " candies ("
+                        + candiesPoppedThisLevel + "/"
+                        + objectiveTarget + ")";
 
             case OBJECTIVE_CONNECTIONS:
-                return "Make " + objectiveTarget
-                        + " connections  ("
-                        + connectionsThisLevel
-                        + "/" + objectiveTarget + ")";
+                return "Make " + objectiveTarget + " connections ("
+                        + connectionsThisLevel + "/"
+                        + objectiveTarget + ")";
 
             case OBJECTIVE_LONG:
                 return "Make " + longConnectionGoal
-                        + " long connections  ("
-                        + longConnections
-                        + "/" + longConnectionGoal + ")";
-
-            case OBJECTIVE_COMBO:
-                return "Reach combo " + objectiveTarget
-                        + "  (" + bestCombo
-                        + "/" + objectiveTarget + ")";
+                        + " long connections ("
+                        + longConnections + "/"
+                        + longConnectionGoal + ")";
 
             case OBJECTIVE_MIXED:
                 return "Score " + objectiveTarget
-                        + " + " + longConnectionGoal
+                        + " and make " + longConnectionGoal
                         + " long connections";
 
             default:
@@ -833,117 +509,32 @@ public class GameView extends View {
     }
 
     private void drawTimer(Canvas canvas) {
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTextSize(dp(23));
+        textPaint.setFakeBoldText(true);
 
-        float centerX = getWidth() / 2f;
-        float y = dp(198);
-
-        int timerColor = secondsLeft <= 10
+        textPaint.setColor(secondsLeft <= 10
                 ? Color.rgb(255, 75, 75)
-                : Color.rgb(80, 225, 145);
+                : Color.rgb(80, 225, 145));
 
-        paint.setColor(timerColor);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(23));
-        paint.setFakeBoldText(true);
-
-        String timerText = String.format(
-                java.util.Locale.getDefault(),
+        String value = String.format(
+                Locale.getDefault(),
                 "%02d:%02d",
                 secondsLeft / 60,
                 secondsLeft % 60
         );
 
         canvas.drawText(
-                timerText,
-                centerX,
-                y,
-                paint
+                value,
+                getWidth() / 2f,
+                dp(215),
+                textPaint
         );
 
-        paint.setFakeBoldText(false);
+        textPaint.setFakeBoldText(false);
     }
 
-    private void drawBoard(Canvas canvas) {
-
-        float right = boardLeft + cellSize * COLS;
-        float bottom = boardTop + cellSize * ROWS;
-
-        drawRoundedPanel(
-                canvas,
-                boardLeft - dp(5),
-                boardTop - dp(5),
-                right + dp(5),
-                bottom + dp(5),
-                Color.rgb(25, 36, 54),
-                dp(17)
-        );
-
-        for (int row = 0; row < ROWS; row++) {
-
-            for (int col = 0; col < COLS; col++) {
-
-                float left = boardLeft + col * cellSize;
-                float top = boardTop + row * cellSize;
-
-                float inset = cellSize * 0.07f;
-
-                RectF cellRect = new RectF(
-                        left + inset,
-                        top + inset,
-                        left + cellSize - inset,
-                        top + cellSize - inset
-                );
-
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(Color.rgb(35, 49, 69));
-
-                canvas.drawRoundRect(
-                        cellRect,
-                        dp(9),
-                        dp(9),
-                        paint
-                );
-
-                int type = board[row][col];
-
-                if (type >= 0) {
-                    drawCandy(
-                            canvas,
-                            row,
-                            col,
-                            type
-                    );
-                }
-
-                if (isCellSelected(row, col)) {
-                    drawSelectedCell(
-                            canvas,
-                            cellRect
-                    );
-                }
-            }
-        }
-    }
-
-    private void drawSelectedCell(
-            Canvas canvas,
-            RectF rect) {
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(dp(3));
-        paint.setColor(Color.WHITE);
-
-        canvas.drawRoundRect(
-                rect,
-                dp(9),
-                dp(9),
-                paint
-        );
-
-        paint.setStyle(Paint.Style.FILL);
-    }
-
-    private void drawRoundedPanel(
+    private void drawPanel(
             Canvas canvas,
             float left,
             float top,
@@ -956,61 +547,249 @@ public class GameView extends View {
         paint.setColor(color);
 
         canvas.drawRoundRect(
-                left,
-                top,
-                right,
-                bottom,
-                radius,
-                radius,
-                paint
+                left, top, right, bottom,
+                radius, radius, paint
         );
     }
-Width(dp(1));
-        paint.setStyle(Paint.Style.STROKE);
 
-        canvas.drawLine(
-                x,
-                y - radius * 0.35f,
-                x,
-                y + radius * 0.35f,
-                paint
+    private void drawBoard(Canvas canvas) {
+        float right = boardLeft + cellSize * COLS;
+        float bottom = boardTop + cellSize * ROWS;
+
+        drawPanel(
+                canvas,
+                boardLeft - dp(5),
+                boardTop - dp(5),
+                right + dp(5),
+                bottom + dp(5),
+                Color.rgb(25, 36, 54),
+                dp(17)
         );
 
-        canvas.drawLine(
-                x - radius * 0.35f,
-                y,
-                x + radius * 0.35f,
-                y,
-                paint
-        );
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
+                float left = boardLeft + col * cellSize;
+                float top = boardTop + row * cellSize;
+                float inset = cellSize * 0.07f;
+
+                RectF rect = new RectF(
+                        left + inset,
+                        top + inset,
+                        left + cellSize - inset,
+                        top + cellSize - inset
+                );
+
+                drawPanel(
+                        canvas,
+                        rect.left, rect.top,
+                        rect.right, rect.bottom,
+                        Color.rgb(35, 49, 69),
+                        dp(9)
+                );
+
+                int type = board[row][col];
+
+                if (type >= 0) {
+                    drawCandy(canvas, row, col, type);
+                }
+
+                if (isCellSelected(row, col)) {
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(dp(3));
+                    paint.setColor(Color.WHITE);
+
+                    canvas.drawRoundRect(
+                            rect,
+                            dp(9), dp(9), paint
+                    );
+
+                    paint.setStyle(Paint.Style.FILL);
+                }
+            }
+        }
+    }
+
+    private void drawCandy(
+            Canvas canvas,
+            int row,
+            int col,
+            int type) {
+
+        float x = boardLeft + col * cellSize + cellSize / 2f;
+        float y = boardTop + row * cellSize + cellSize / 2f;
+        float radius = cellSize * 0.34f;
+
+        int[] colors = getCandyColors(type);
 
         paint.setStyle(Paint.Style.FILL);
-    }
+        paint.setColor(colors[0]);
 
-    private void drawPinkCandy(
-            Canvas canvas,
-            float x,
-            float y,
-            float radius) {
+        switch (type) {
+            case 0:
+                // Red apple
+                canvas.drawCircle(x, y + radius * 0.05f,
+                        radius, paint);
+                paint.setColor(Color.rgb(110, 65, 35));
+                paint.setStrokeWidth(dp(3));
+                canvas.drawLine(x, y - radius * 0.7f,
+                        x + dp(2), y - radius, paint);
+                drawLeaf(canvas, x + radius * 0.3f,
+                        y - radius * 0.75f);
+                break;
 
-        paint.setColor(Color.WHITE);
+            case 1:
+                // Orange
+                canvas.drawCircle(x, y, radius, paint);
+                paint.setColor(Color.rgb(255, 205, 95));
+                canvas.drawCircle(x - radius * 0.35f,
+                        y - radius * 0.35f,
+                        radius * 0.12f, paint);
+                paint.setColor(Color.rgb(80, 175, 85));
+                canvas.drawCircle(x, y - radius * 0.9f,
+                        radius * 0.16f, paint);
+                break;
 
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(radius * 0.85f);
-        paint.setFakeBoldText(true);
+            case 2:
+                // Grapes
+                float grape = radius * 0.42f;
+                canvas.drawCircle(x - grape, y - grape * 0.4f,
+                        grape, paint);
+                canvas.drawCircle(x + grape, y - grape * 0.4f,
+                        grape, paint);
+                canvas.drawCircle(x, y + grape * 0.45f,
+                        grape, paint);
+                canvas.drawCircle(x - grape * 0.5f,
+                        y + grape * 1.15f, grape, paint);
+                canvas.drawCircle(x + grape * 0.5f,
+                        y + grape * 1.15f, grape, paint);
+                break;
 
-        canvas.drawText(
-                "★",
-                x,
-                y + radius * 0.3f,
+            case 3:
+                // Blueberry
+                canvas.drawCircle(x, y, radius, paint);
+                paint.setColor(Color.rgb(190, 220, 255));
+                canvas.drawCircle(x - radius * 0.35f,
+                        y - radius * 0.35f,
+                        radius * 0.18f, paint);
+                paint.setColor(Color.rgb(40, 75, 145));
+                canvas.drawCircle(x, y, radius * 0.18f, paint);
+                break;
+
+            case 4:
+                // Chocolate square
+                RectF chocolate = new RectF(
+                        x - radius, y - radius,
+                        x + radius, y + radius
+                );
+
+                canvas.drawRoundRect(
+                        chocolate, dp(7), dp(7), paint
+                );
+
+                paint.setColor(Color.rgb(190, 125, 80));
+                paint.setStrokeWidth(dp(2));
+
+                canvas.drawLine(
+                        x, y - radius * 0.75f,
+                        x, y + radius * 0.75f, paint
+                );
+
+                canvas.drawLine(
+                        x - radius * 0.75f, y,
+                        x + radius * 0.75f, y, paint
+                );
+                break;
+
+            case 5:
+                // Pink strawberry
+                Path berry = new Path();
+                berry.moveTo(x, y + radius);
+                berry.cubicTo(
+                        x - radius * 1.25f,
+                        y + radius * 0.1f,
+                        x - radius * 0.8f,
+                        y - radius,
+                        x, y - radius * 0.55f
+                );
+                berry.cubicTo(
+                        x + radius * 0.8f,
+                        y - radius,
+                        x + radius * 1.25f,
+                        y + radius * 0.1f,
+                        x, y + radius
+                );
+
+                paint.setColor(colors[0]);
+                canvas.drawPath(berry, paint);
+
+                paint.setColor(Color.WHITE);
+                for (int i = 0; i < 5; i++) {
+                    float sx = x + (i - 2) * radius * 0.28f;
+                    float sy = y + ((i % 2) - 0.3f) * radius * 0.55f;
+                    canvas.drawCircle(sx, sy, dp(1.5f), paint);
+                }
+
+                drawLeaf(canvas, x, y - radius * 0.75f);
+                break;
+        }
+
+        // Glossy highlight
+        paint.setColor(Color.argb(110, 255, 255, 255));
+        canvas.drawCircle(
+                x - radius * 0.35f,
+                y - radius * 0.38f,
+                radius * 0.16f,
                 paint
         );
+    }
 
-        paint.setFakeBoldText(false);
+    private int[] getCandyColors(int type) {
+        switch (type) {
+            case 0:
+                return new int[]{
+                        Color.rgb(220, 45, 60),
+                        Color.rgb(255, 125, 135)
+                };
+            case 1:
+                return new int[]{
+                        Color.rgb(245, 135, 35),
+                        Color.rgb(255, 195, 90)
+                };
+            case 2:
+                return new int[]{
+                        Color.rgb(125, 65, 190),
+                        Color.rgb(190, 125, 235)
+                };
+            case 3:
+                return new int[]{
+                        Color.rgb(55, 125, 225),
+                        Color.rgb(150, 215, 255)
+                };
+            case 4:
+                return new int[]{
+                        Color.rgb(105, 55, 30),
+                        Color.rgb(175, 105, 65)
+                };
+            default:
+                return new int[]{
+                        Color.rgb(245, 75, 160),
+                        Color.rgb(255, 165, 215)
+                };
+        }
+    }
+
+    private void drawLeaf(Canvas canvas, float x, float y) {
+        paint.setColor(Color.rgb(70, 190, 95));
+
+        RectF leaf = new RectF(
+                x - dp(5), y - dp(3),
+                x + dp(5), y + dp(3)
+        );
+
+        canvas.drawOval(leaf, paint);
     }
 
     private void drawConnection(Canvas canvas) {
-
         if (selected.size() < 2) {
             return;
         }
@@ -1018,7 +797,6 @@ Width(dp(1));
         connectionPath.reset();
 
         for (int i = 0; i < selected.size(); i++) {
-
             int[] cell = selected.get(i);
 
             float x = boardLeft
@@ -1036,23 +814,18 @@ Width(dp(1));
             }
         }
 
-        lineGlowPaint.setColor(
-                Color.argb(90, 255, 255, 255)
-        );
-        lineGlowPaint.setStrokeWidth(dp(11));
-
-        canvas.drawPath(connectionPath, lineGlowPaint);
-
-        linePaint.setColor(Color.WHITE);
-        linePaint.setStrokeWidth(dp(4));
-
+        linePaint.setColor(Color.argb(100, 255, 255, 255));
+        linePaint.setStrokeWidth(dp(10));
         canvas.drawPath(connectionPath, linePaint);
 
-        paint.setColor(Color.WHITE);
+        linePaint.setColor(Color.WHITE);
+        linePaint.setStrokeWidth(dp(3));
+        canvas.drawPath(connectionPath, linePaint);
+
         paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
 
         for (int[] cell : selected) {
-
             float x = boardLeft
                     + cell[1] * cellSize
                     + cellSize / 2f;
@@ -1061,33 +834,24 @@ Width(dp(1));
                     + cell[0] * cellSize
                     + cellSize / 2f;
 
-            canvas.drawCircle(
-                    x,
-                    y,
-                    dp(4),
-                    paint
-            );
+            canvas.drawCircle(x, y, dp(4), paint);
         }
     }
 
     private void drawBottomInfo(Canvas canvas) {
-
-        float y = getHeight() - dp(35);
-
-        paint.setColor(Color.rgb(155, 175, 195));
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(11));
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTextSize(dp(11));
+        textPaint.setColor(Color.rgb(155, 175, 195));
 
         canvas.drawText(
                 "Drag across matching fruits to connect them",
                 getWidth() / 2f,
-                y,
-                paint
+                getHeight() - dp(20),
+                textPaint
         );
     }
 
     private void drawEffects(Canvas canvas) {
-
         if (!animating || poppingCells.isEmpty()) {
             return;
         }
@@ -1111,7 +875,6 @@ Width(dp(1));
         );
 
         for (int[] cell : poppingCells) {
-
             float x = boardLeft
                     + cell[1] * cellSize
                     + cellSize / 2f;
@@ -1120,19 +883,14 @@ Width(dp(1));
                     + cell[0] * cellSize
                     + cellSize / 2f;
 
-            canvas.drawCircle(
-                    x,
-                    y,
-                    radius,
-                    effectPaint
-            );
+            canvas.drawCircle(x, y, radius, effectPaint);
         }
 
         effectPaint.setStyle(Paint.Style.FILL);
     }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-
         if (gameFinished || animating) {
             return true;
         }
@@ -1141,9 +899,7 @@ Width(dp(1));
         float y = event.getY();
 
         switch (event.getAction()) {
-
             case MotionEvent.ACTION_DOWN:
-
                 int[] start = getCellFromPosition(x, y);
 
                 if (start == null) {
@@ -1162,20 +918,13 @@ Width(dp(1));
                 connectionCandyType = type;
                 drawing = true;
 
-                lastTouchX = x;
-                lastTouchY = y;
-
                 invalidate();
                 return true;
 
             case MotionEvent.ACTION_MOVE:
-
                 if (!drawing) {
                     return true;
                 }
-
-                currentFingerX = x;
-                currentFingerY = y;
 
                 int[] next = getCellFromPosition(x, y);
 
@@ -1187,9 +936,14 @@ Width(dp(1));
                 return true;
 
             case MotionEvent.ACTION_UP:
-
                 if (drawing) {
                     drawing = false;
+
+                    int[] last = getCellFromPosition(x, y);
+
+                    if (last != null) {
+                        addSelectedCell(last[0], last[1]);
+                    }
 
                     if (selected.size() >= minimumConnection) {
                         removeSelected();
@@ -1202,7 +956,6 @@ Width(dp(1));
                 return true;
 
             case MotionEvent.ACTION_CANCEL:
-
                 clearSelection();
                 return true;
         }
@@ -1211,7 +964,6 @@ Width(dp(1));
     }
 
     private int[] getCellFromPosition(float x, float y) {
-
         if (cellSize <= 0) {
             return null;
         }
@@ -1228,7 +980,6 @@ Width(dp(1));
     }
 
     private void addSelectedCell(int row, int col) {
-
         if (row < 0 || row >= ROWS
                 || col < 0 || col >= COLS) {
             return;
@@ -1239,6 +990,10 @@ Width(dp(1));
         }
 
         if (isCellSelected(row, col)) {
+            return;
+        }
+
+        if (selected.isEmpty()) {
             return;
         }
 
@@ -1258,7 +1013,6 @@ Width(dp(1));
     }
 
     private void removeSelected() {
-
         if (selected.size() < minimumConnection) {
             clearSelection();
             return;
@@ -1274,8 +1028,7 @@ Width(dp(1));
             );
         }
 
-        // Score increases with chain length.
-        // There is deliberately no score cap.
+        // Scores are unlimited. Longer chains earn more points.
         int points = chainLength * chainLength * 10;
 
         if (chainLength >= 5) {
@@ -1301,12 +1054,6 @@ Width(dp(1));
             bestCombo = combo;
         }
 
-        if (objectiveType == OBJECTIVE_COMBO
-                && bestCombo >= objectiveTarget) {
-            // Objective is recorded as complete.
-            // The player continues until the timer expires.
-        }
-
         selected.clear();
         connectionCandyType = -1;
 
@@ -1322,9 +1069,7 @@ Width(dp(1));
     }
 
     private boolean levelObjectiveComplete() {
-
         switch (objectiveType) {
-
             case OBJECTIVE_CANDIES:
                 return candiesPoppedThisLevel >= objectiveTarget;
 
@@ -1333,9 +1078,6 @@ Width(dp(1));
 
             case OBJECTIVE_LONG:
                 return longConnections >= longConnectionGoal;
-
-            case OBJECTIVE_COMBO:
-                return bestCombo >= objectiveTarget;
 
             case OBJECTIVE_MIXED:
                 return score >= objectiveTarget
@@ -1346,23 +1088,13 @@ Width(dp(1));
         }
     }
 
-    private void updateComboAfterMove() {
-
-        if (selected.size() < minimumConnection) {
-            combo = 0;
-        }
-    }
     private void refillBoard() {
-
-        // Move remaining candies down each column.
+        // Drop remaining candies down each column.
         for (int col = 0; col < COLS; col++) {
-
             int writeRow = ROWS - 1;
 
             for (int row = ROWS - 1; row >= 0; row--) {
-
                 if (board[row][col] >= 0) {
-
                     board[writeRow][col] = board[row][col];
 
                     if (writeRow != row) {
@@ -1377,6 +1109,7 @@ Width(dp(1));
             while (writeRow >= 0) {
                 board[writeRow][col] =
                         random.nextInt(CANDY_TYPES);
+
                 writeRow--;
             }
         }
@@ -1385,12 +1118,7 @@ Width(dp(1));
     }
 
     private void showTimeUpDialog() {
-
-        if (gameFinished) {
-            return;
-        }
-
-        if (animating) {
+        if (gameFinished || animating) {
             return;
         }
 
@@ -1422,7 +1150,6 @@ Width(dp(1));
     }
 
     private void levelComplete() {
-
         gameFinished = true;
 
         timerHandler.removeCallbacks(timerRunnable);
@@ -1451,7 +1178,6 @@ Width(dp(1));
                 .apply();
 
         if (level >= MAX_LEVEL) {
-
             new AlertDialog.Builder(getContext())
                     .setTitle("YOU DID IT!")
                     .setMessage(
@@ -1491,7 +1217,6 @@ Width(dp(1));
     }
 
     private void restartLevel() {
-
         timerHandler.removeCallbacks(timerRunnable);
         animationHandler.removeCallbacks(animationRunnable);
 
@@ -1499,7 +1224,6 @@ Width(dp(1));
     }
 
     private void goHome() {
-
         timerHandler.removeCallbacks(timerRunnable);
         animationHandler.removeCallbacks(animationRunnable);
 
@@ -1509,3 +1233,12 @@ Width(dp(1));
             ((Activity) getContext()).finish();
         }
     }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        timerHandler.removeCallbacks(timerRunnable);
+        animationHandler.removeCallbacks(animationRunnable);
+
+        super.onDetachedFromWindow();
+    }
+}
