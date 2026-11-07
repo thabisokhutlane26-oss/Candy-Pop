@@ -26,6 +26,15 @@ public class GameSound {
         return settings.getBoolean("sound_enabled", true);
     }
 
+    public void playSelect() {
+        if (isSoundEnabled()) {
+            toneGenerator.startTone(
+                    ToneGenerator.TONE_PROP_CLICK,
+                    35
+            );
+        }
+    }
+
     public void playPop() {
         if (isSoundEnabled()) {
             toneGenerator.startTone(
