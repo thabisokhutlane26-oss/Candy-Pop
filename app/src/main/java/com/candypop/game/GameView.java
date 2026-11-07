@@ -1,3 +1,4 @@
+
 package com.candypop.game;
 
 import android.app.Activity;
@@ -1040,6 +1041,7 @@ public class GameView extends View {
         }
 
         score += points;
+        saveHighScore();
 
         candiesPoppedThisLevel += chainLength;
         connectionsThisLevel++;
@@ -1066,6 +1068,25 @@ public class GameView extends View {
         animationHandler.post(animationRunnable);
 
         invalidate();
+    }
+
+    private void saveHighScore() {
+        SharedPreferences preferences =
+                getContext().getSharedPreferences(
+                        "CandyPopScores",
+                        Context.MODE_PRIVATE
+                );
+
+        int savedHighScore = preferences.getInt(
+                "high_score",
+                0
+        );
+
+        if (score > savedHighScore) {
+            preferences.edit()
+                    .putInt("high_score", score)
+                    .apply();
+        }
     }
 
     private boolean levelObjectiveComplete() {
